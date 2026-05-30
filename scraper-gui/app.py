@@ -12,6 +12,7 @@ import threading
 from collections import OrderedDict, Counter
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 import requests
 from flask import Flask, render_template_string, request, send_file, jsonify
@@ -113,8 +114,19 @@ def geocode_city(city_str: str) -> dict | None:
         return None
 
 
+# Transient HTTP statuses worth retrying on the SAME endpoint before moving on.
+# (429 = rate limited, 502/503/504 = mirror overloaded — all usually clear up.)
+RETRY_STATUS = {429, 502, 503, 504}
+
+
 def overpass_query(bbox: tuple, tag_filters: list, timeout: int = 60) -> list:
-    """Run an Overpass query for nwr matching any tag in tag_filters within bbox."""
+    """Run an Overpass query for nwr matching any tag in tag_filters within bbox.
+
+    Rotates through OVERPASS_ENDPOINTS. Transient failures (rate-limit / gateway
+    timeout / read timeout) are retried once on the same mirror with a short
+    backoff; hard rejections (403/406) skip straight to the next mirror. Raises
+    RuntimeError with a per-mirror breakdown only if every mirror fails.
+    """
     south, west, north, east = bbox
     parts = []
     for tf in tag_filters:
@@ -125,18 +137,31 @@ def overpass_query(bbox: tuple, tag_filters: list, timeout: int = 60) -> list:
     if not parts:
         return []
     body = f"[out:json][timeout:{timeout}];\n(\n  " + "\n  ".join(parts) + "\n);\nout center tags;"
-    last_err = None
+    errors = []
     for endpoint in OVERPASS_ENDPOINTS:
-        try:
-            r = requests.post(endpoint, data=body, headers={"User-Agent": UA},
-                              timeout=timeout + 10)
-            if r.status_code == 200:
-                return r.json().get("elements", [])
-            last_err = f"{endpoint} -> HTTP {r.status_code}"
-        except Exception as e:
-            last_err = f"{endpoint} -> {type(e).__name__}"
-            continue
-    raise RuntimeError(f"All Overpass endpoints failed. Last: {last_err}")
+        host = _hostname(endpoint) or endpoint
+        for attempt in range(2):  # initial try + one retry for transient errors
+            try:
+                r = requests.post(endpoint, data=body, headers={"User-Agent": UA},
+                                  timeout=timeout + 10)
+                if r.status_code == 200:
+                    return r.json().get("elements", [])
+                errors.append(f"{host} HTTP {r.status_code}")
+                if r.status_code in RETRY_STATUS and attempt == 0:
+                    time.sleep(2)
+                    continue  # retry same mirror
+                break  # hard rejection — move to next mirror
+            except requests.exceptions.RequestException as e:
+                errors.append(f"{host} {type(e).__name__}")
+                if attempt == 0:
+                    time.sleep(2)
+                    continue  # transient network error — retry once
+                break
+    raise RuntimeError(
+        "All Overpass mirrors failed (" + "; ".join(errors) + "). "
+        "This is usually temporary mirror overload — wait a minute and retry. "
+        "If it persists on a cloud/VPN IP, some mirrors block those; try a home connection."
+    )
 
 
 def osm_to_lead(el: dict, niche_label: str) -> dict | None:
@@ -144,6 +169,10 @@ def osm_to_lead(el: dict, niche_label: str) -> dict | None:
     name = tags.get("name") or tags.get("operator")
     if not name:
         return None  # unnamed amenities aren't useful leads
+    # Skip national chains/franchises — a `brand` tag means corporate marketing
+    # owns the website decision; they won't buy from a local web designer.
+    if tags.get("brand") or tags.get("brand:wikidata"):
+        return None
     addr_parts = []
     for k in ("addr:housenumber", "addr:street"):
         if tags.get(k):
@@ -205,12 +234,24 @@ WEAK_DOMAINS = (
     "groupon.com", "locality.com", "nextdoor.com",
 )
 
+def _hostname(url: str) -> str:
+    """Lowercased hostname for a URL, tolerant of missing scheme."""
+    if not url:
+        return ""
+    u = url if "://" in url else "http://" + url
+    try:
+        return (urlparse(u).hostname or "").lower()
+    except Exception:
+        return ""
+
+
 def is_weak_url(url: str):
     if not url:
         return True, "no website"
-    u = url.lower()
+    host = _hostname(url)
+    # match on domain boundary, not substring — "x.com" must not flag "fedex.com"
     for d in WEAK_DOMAINS:
-        if d in u:
+        if host == d or host.endswith("." + d):
             return True, d
     return False, ""
 
