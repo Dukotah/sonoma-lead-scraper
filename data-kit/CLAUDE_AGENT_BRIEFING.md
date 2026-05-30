@@ -69,9 +69,15 @@ sonoma_leads/
 ## Tasks the user wants done
 1. **Triage:** Tier every business by lead quality
 2. **Audit:** Live-fetch each website, score quality
-3. **Enrich:** For "no website" leads, Google to confirm; flag false positives
+3. **Enrich:** For "no website" leads, search the web to confirm; flag false positives
 4. **Pitch:** Generate a personalized 1-paragraph cold-call opener per Tier-A lead
 5. **Export:** Excel/CSV grouped by niche + city, sorted by score, with phone & pitch
+
+**Already built — `enrich_leads.py` (+ `lead_tools.py`) covers 1–5 for a chosen niche:**
+it filters the Overture data (chains + non-business POIs removed), live-audits existing
+sites, web-verifies the "no website" leads, scores/tiers everything, and exports a ranked
+xlsx + CRM csv. It can also `--merge-osm` a GUI export to combine both data sources.
+Extend it (better pitch copy, per-niche batching, license cross-check) rather than starting fresh.
 
 ## Stretch goals
 - Cross-reference with Sonoma County business license rolls (https://data-sonomacounty.opendata.arcgis.com/)
@@ -85,5 +91,6 @@ sonoma_leads/
 - Don't include national chains in outreach lists (waste of time, kills your conversion rate)
 
 ## Releases & freshness
-Overture publishes a new release roughly monthly. To get fresh data, edit `RELEASE` in
-download_sonoma.py to the newest version from https://docs.overturemaps.org/release/latest/
+Overture publishes a new release roughly monthly. `download_sonoma.py` now **auto-detects
+the newest release** from S3 on every run (with a known-good fallback), so you just re-run it
+to refresh — no manual version bump needed.
