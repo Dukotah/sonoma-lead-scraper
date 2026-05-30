@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+env/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+
+# Data files (don't commit huge parquet/csv to git)
+*.parquet
+*.csv
+*.xlsx
+!data-kit/sample_*.xlsx
+data-kit/sonoma_places.*
+data-kit/sonoma_businesses.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# OS
+Thumbs.db
