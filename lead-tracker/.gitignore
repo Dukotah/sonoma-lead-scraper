@@ -1,0 +1,7 @@
+node_modules/
+.next/
+# Generated data (large; Overture is CC-BY — don't republish the raw set).
+data/*.sqlite
+data/*.sqlite-*
+data/*.parquet
+data/*.csv

@@ -1,0 +1,18 @@
+{
+  "name": "lead-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3030",
+    "build": "next build",
+    "start": "next start -p 3030",
+    "build-db": "python3 scripts/build_leads_db.py"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
