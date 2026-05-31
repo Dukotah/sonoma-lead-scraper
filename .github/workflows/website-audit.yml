@@ -1,0 +1,81 @@
+name: Website Audit
+
+# Runs the live website audit on GitHub's runners (which have outbound internet,
+# unlike the build sandbox). Fetches each lead's site, grades it
+# (good/weak/broken), and commits the results CSV back so the CRM can join them.
+# Trigger it by hand from the Actions tab (optionally pick a county), or let the
+# weekly schedule chip away. Resumable: already-audited leads are skipped.
+
+on:
+  workflow_dispatch:
+    inputs:
+      county:
+        description: "Which county to audit (or 'all')"
+        type: choice
+        default: all
+        options: [all, sonoma, napa, marin, mendocino, lake, solano]
+      tiers:
+        description: "Tiers to audit (have a website worth checking)"
+        default: "B,C"
+      limit:
+        description: "Max sites per county per run (0 = no cap)"
+        default: "4000"
+  schedule:
+    - cron: "0 7 * * 1"   # Mondays 07:00 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: website-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --quiet requests
+
+      - name: Run audit
+        env:
+          COUNTY: ${{ github.event.inputs.county || 'all' }}
+          TIERS: ${{ github.event.inputs.tiers || 'B,C' }}
+          LIMIT: ${{ github.event.inputs.limit || '4000' }}
+        run: |
+          set -e
+          cd lead-tracker
+          mkdir -p data/export/audit
+          if [ "$COUNTY" = "all" ]; then
+            COUNTIES="sonoma napa marin mendocino lake solano"
+          else
+            COUNTIES="$COUNTY"
+          fi
+          for c in $COUNTIES; do
+            IN="data/export/$c/${c}_leads_full.csv"
+            OUT="data/export/audit/${c}_audit.csv"
+            if [ ! -f "$IN" ]; then echo "skip $c (no $IN)"; continue; fi
+            echo "::group::audit $c"
+            python scripts/audit_ci.py --in "$IN" --out "$OUT" \
+              --tiers "$TIERS" --workers 12 --limit "$LIMIT"
+            echo "::endgroup::"
+          done
+
+      - name: Commit results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lead-tracker/data/export/audit/*.csv || true
+          if git diff --cached --quiet; then
+            echo "No audit changes to commit."
+          else
+            git commit -m "ci: website audit results [skip ci]"
+            git push
+          fi
