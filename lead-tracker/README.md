@@ -1,11 +1,23 @@
 # Lead Tracker
 
-A CRM-lite for working web-design leads: a fast, filterable table over the whole
-**Bay Area + Wine Country** business set (Sonoma, Napa, Marin, Mendocino, Lake,
-Solano + greater Bay Area — ~267K cleaned leads), with a per-lead status pipeline,
-notes, favorites, and CSV export. Built as a drop-in **Next.js (App Router)** module
-backed by a local **SQLite** file. Single-user, runs entirely on your machine — no
-cloud, no accounts.
+A CRM-lite for working web-design leads: a fast, filterable table over a whole
+region's businesses, with a per-lead status pipeline, notes, favorites, and CSV
+export. Built as a drop-in **Next.js (App Router)** module backed by a local
+**SQLite** file. Single-user, runs entirely on your machine — no cloud, no accounts.
+
+The dataset is **region-parameterized** — build any area you want (default:
+**all of California**, ~1.23M cleaned leads, ~309K Tier-A, 1,877 niches). SQLite
+stays snappy into the low millions of rows; queries return in milliseconds.
+
+| Region (`build-db <key>`) | Businesses | Cleaned leads | ~Tier-A | SQLite |
+|---|---|---|---|---|
+| `bayarea` (Bay Area + Wine Country) | 417K | 267K | 51K | ~140 MB |
+| `california` *(default)* | 1.94M | 1.23M | 309K | ~635 MB |
+| `westcoast` (CA/OR/WA) | 2.66M | ~1.7M | ~325K | ~0.9 GB |
+| `us` (whole country) | ~60M+ | ~38M | ~7M+ | ~20 GB † |
+
+† At US scale a single SQLite file gets unwieldy — switch the backend to
+DuckDB-over-Parquet (the `lib/db.js` layer is the only file that changes).
 
 ## Data source
 Business records come from [Overture Maps](https://overturemaps.org) (the open
@@ -20,7 +32,8 @@ non-business POIs, and tiers each lead:
 ```bash
 cd lead-tracker
 npm install
-npm run build-db        # pulls Overture, builds data/leads.sqlite (~1-3 min, needs python3 + duckdb)
+npm run build-db        # builds California into data/leads.sqlite (~3-5 min; needs python3)
+                        # other regions: python3 scripts/build_leads_db.py bayarea|westcoast|us
 npm run dev             # http://localhost:3030  → redirects to /leads
 ```
 If you already have `data/leads.sqlite` (e.g. it was handed to you), skip

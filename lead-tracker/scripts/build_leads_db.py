@@ -37,11 +37,35 @@ except ImportError:
     import duckdb
 
 # ---------------------------------------------------------------------------
-# Region config. Swap the bbox to target a different area (draw a box at
-# https://bboxfinder.com and paste the numbers). Counts scale roughly with area.
+# Region config. Pick a region with `python build_leads_db.py <region>` or the
+# REGION env var (default: california). Add your own to REGIONS, or pass a custom
+# box without editing this file:
+#     REGION_NAME="North Bay" REGION_BBOX="38.0,-123.6,38.9,-122.3" python build_leads_db.py
+# (bbox order is south,west,north,east -- grab numbers from https://bboxfinder.com)
+# Counts scale roughly with area; see the table in lead-tracker/README.md.
 # ---------------------------------------------------------------------------
-REGION_NAME = "Bay Area + Wine Country"
-BBOX = {"south": 36.85, "west": -124.05, "north": 40.05, "east": -121.45}
+REGIONS = {
+    "bayarea":    ("Bay Area + Wine Country", {"south": 36.85, "west": -124.05, "north": 40.05, "east": -121.45}),
+    "california": ("California",              {"south": 32.50, "west": -124.50, "north": 42.05, "east": -114.10}),
+    "westcoast":  ("West Coast (CA/OR/WA)",  {"south": 32.50, "west": -124.90, "north": 49.05, "east": -114.00}),
+    "us":         ("United States",          {"south": 24.40, "west": -125.00, "north": 49.50, "east": -66.90}),
+}
+
+
+def select_region():
+    """Resolve the target region from CLI arg, REGION env, or custom bbox env."""
+    if os.environ.get("REGION_BBOX"):
+        s, w, n, e = (float(x) for x in os.environ["REGION_BBOX"].split(","))
+        return (os.environ.get("REGION_NAME", "Custom region"),
+                {"south": s, "west": w, "north": n, "east": e})
+    key = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("REGION", "california")).lower()
+    if key not in REGIONS:
+        sys.exit(f"Unknown region '{key}'. Choices: {', '.join(REGIONS)} "
+                 f"(or set REGION_BBOX='south,west,north,east').")
+    return REGIONS[key]
+
+
+REGION_NAME, BBOX = select_region()
 
 FALLBACK_RELEASE = "2026-05-20.0"
 
@@ -156,11 +180,15 @@ COPY (
 raw_n = con.execute(f"SELECT COUNT(*) FROM '{PARQUET_PATH}'").fetchone()[0]
 print(f"  -> {PARQUET_PATH} ({raw_n:,} records, {round(time.time()-t0)}s)")
 
-# 2) Flatten + tag chains, compute tier. Build a clean 'leads' result set.
+# 2) Flatten + tag chains, compute tier into a clean DuckDB table. Materializing
+#    to a table (instead of fetching into Python) keeps memory flat for big
+#    regions like California (~1.2M leads) -- we stream it into SQLite below.
 print("Cleaning, de-chaining, and tiering...")
 weak_sql = " OR ".join(f"lower(website) LIKE '%{w}%'" for w in WEAK_DOMAINS)
 nonbiz_sql = ", ".join(f"'{c}'" for c in NON_BUSINESS_CATEGORIES)
-rows = con.execute(f"""
+con.execute("DROP TABLE IF EXISTS leads_clean")
+con.execute(f"""
+CREATE TABLE leads_clean AS
 WITH flat AS (
   SELECT
     id, name, category,
@@ -202,17 +230,14 @@ FROM tagged
 WHERE NOT is_chain
   AND (category IS NULL OR category NOT IN ({nonbiz_sql}))
 ORDER BY tier ASC, city ASC, name ASC
-""").fetchall()
-cols = [d[0] for d in con.description]
-print(f"  -> {len(rows):,} clean leads "
-      f"(Tier A: {sum(1 for r in rows if r[cols.index('tier')]=='A'):,})")
+""")
+cols = [d[0] for d in con.execute("SELECT * FROM leads_clean LIMIT 0").description]
+n_clean = con.execute("SELECT COUNT(*) FROM leads_clean").fetchone()[0]
+n_a_clean = con.execute("SELECT COUNT(*) FROM leads_clean WHERE tier='A'").fetchone()[0]
+print(f"  -> {n_clean:,} clean leads (Tier A: {n_a_clean:,})")
 
-# 3) Write the flat CSV (cleaned leads).
-import csv
-with open(CSV_PATH, "w", newline="", encoding="utf-8") as fh:
-    w = csv.writer(fh)
-    w.writerow(cols)
-    w.writerows(rows)
+# 3) Write the flat CSV straight from DuckDB (no Python-side buffering).
+con.execute(f"COPY leads_clean TO '{CSV_PATH}' (HEADER, DELIMITER ',')")
 print(f"  -> {CSV_PATH}")
 
 # 4) Build SQLite. Rebuild 'leads' + FTS; PRESERVE existing 'crm' tracking state.
@@ -242,7 +267,19 @@ CREATE TABLE leads (
 )
 """)
 placeholders = ", ".join("?" * len(cols))
-db.executemany(f"INSERT OR REPLACE INTO leads ({', '.join(cols)}) VALUES ({placeholders})", rows)
+insert_sql = f"INSERT OR REPLACE INTO leads ({', '.join(cols)}) VALUES ({placeholders})"
+cur = con.execute("SELECT * FROM leads_clean")
+inserted = 0
+db.execute("BEGIN")
+while True:
+    batch = cur.fetchmany(50000)
+    if not batch:
+        break
+    db.executemany(insert_sql, batch)
+    inserted += len(batch)
+    print(f"    inserted {inserted:,}/{n_clean:,}", end="\r", flush=True)
+db.commit()
+print(f"    inserted {inserted:,} rows" + " " * 24)
 
 # Indexes for the filters the app exposes.
 for col in ("city", "category", "tier"):
