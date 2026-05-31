@@ -29,7 +29,31 @@ script pulls a region straight from Overture's public S3 bucket, drops chains an
 non-business POIs, and tiers each lead:
 
 - **Tier A** — no website, or only a social/listing page (your hottest prospects)
-- **Tier C** — has a real website (audit before pitching)
+- **Tier B** — a DIY builder site (Wix/Weebly/GoDaddy/Square/…) — upsell to custom
+- **Tier C** — has a real custom website (audit before pitching)
+
+## Enrichment
+Every build is automatically enriched (offline — no network needed) by
+`scripts/enrich_leads.py`, which adds per-lead:
+
+- **tier** A/B/C (incl. DIY-builder detection) + **builder** name
+- **score** 0–100 lead priority (need + reachability + Overture confidence)
+- **phone_fmt** `(707) 555-1234` + **area_code**
+- **social_platforms** present, **email_owned** (email domain == site domain)
+- **completeness** 0–100, **best_contact** (phone/email/social), and a
+  **personalized pitch** line tailored to the lead's tier, niche, and city
+
+**Live website audit (run locally — needs outbound internet):**
+```bash
+npm run audit              # = python3 scripts/audit_websites.py
+python3 scripts/audit_websites.py --tier C --limit 500 --workers 12
+```
+This fetches each Tier B/C site and records real HTTPS / HTTP-status /
+mobile-viewport / load-time / builder-from-HTML signals into an `audit` table
+(preserved across rebuilds, like `crm`). It surfaces "has a *bad* website"
+warm leads — a `weak`/`broken` Tier-C site is a real prospect. The tracker
+shows audit badges and the CSV export includes every audit column. Re-run
+`npm run enrich` anytime to recompute the offline fields.
 
 ## Run it standalone (fastest way to see it)
 ```bash
