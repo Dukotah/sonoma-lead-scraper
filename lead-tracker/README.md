@@ -82,7 +82,15 @@ Status pipeline: `New → Contacted → Quoted → Won → Lost`.
 
 ## Refresh / re-target
 - **New Overture release:** re-run `npm run build-db` (it auto-detects the newest release).
-- **Different region:** edit `BBOX` at the top of `scripts/build_leads_db.py`
-  (grab coordinates from https://bboxfinder.com), then rebuild.
+- **Different region:** pass a built-in key, or a custom bounding box — no file edits:
+  ```bash
+  python3 scripts/build_leads_db.py westcoast      # built-in: bayarea | california | westcoast | us
+  REGION=bayarea python3 scripts/build_leads_db.py # or via env var
+  REGION_NAME="North Bay" REGION_BBOX="38.0,-123.6,38.9,-122.3" \
+    python3 scripts/build_leads_db.py              # custom box (south,west,north,east)
+  ```
+  Grab custom coordinates from https://bboxfinder.com. Your **`crm` tracking
+  table is preserved** across rebuilds — switching/expanding regions keeps the
+  status/notes for any lead that still exists (matched by stable Overture ID).
 
 Credit "Overture Maps Foundation" if you publish anything derived from this data.
