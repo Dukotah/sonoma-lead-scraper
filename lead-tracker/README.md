@@ -6,13 +6,16 @@ export. Built as a drop-in **Next.js (App Router)** module backed by a local
 **SQLite** file. Single-user, runs entirely on your machine — no cloud, no accounts.
 
 The dataset is **region-parameterized** — build any area you want (default:
-**all of California**, ~1.23M cleaned leads, ~309K Tier-A, 1,877 niches). SQLite
-stays snappy into the low millions of rows; queries return in milliseconds.
+**Sonoma County**, the primary target area: ~20K cleaned leads, ~3.7K Tier-A,
+644 niches, all of it). SQLite stays snappy into the low millions of rows;
+queries return in milliseconds, so you can scale up to the whole state or coast
+anytime with one command.
 
 | Region (`build-db <key>`) | Businesses | Cleaned leads | ~Tier-A | SQLite |
 |---|---|---|---|---|
+| `sonoma` (Sonoma County) *(default)* | 33K | 20K | 3.7K | ~11 MB |
 | `bayarea` (Bay Area + Wine Country) | 417K | 267K | 51K | ~140 MB |
-| `california` *(default)* | 1.94M | 1.23M | 309K | ~635 MB |
+| `california` | 1.94M | 1.23M | 309K | ~635 MB |
 | `westcoast` (CA/OR/WA) | 2.66M | ~1.7M | ~325K | ~0.9 GB |
 | `us` (whole country) | ~60M+ | ~38M | ~7M+ | ~20 GB † |
 
@@ -32,8 +35,8 @@ non-business POIs, and tiers each lead:
 ```bash
 cd lead-tracker
 npm install
-npm run build-db        # builds California into data/leads.sqlite (~3-5 min; needs python3)
-                        # other regions: python3 scripts/build_leads_db.py bayarea|westcoast|us
+npm run build-db        # builds Sonoma County into data/leads.sqlite (~1-2 min; needs python3)
+                        # other regions: python3 scripts/build_leads_db.py bayarea|california|westcoast|us
 npm run dev             # http://localhost:3030  → redirects to /leads
 ```
 If you already have `data/leads.sqlite` (e.g. it was handed to you), skip
@@ -84,8 +87,8 @@ Status pipeline: `New → Contacted → Quoted → Won → Lost`.
 - **New Overture release:** re-run `npm run build-db` (it auto-detects the newest release).
 - **Different region:** pass a built-in key, or a custom bounding box — no file edits:
   ```bash
-  python3 scripts/build_leads_db.py westcoast      # built-in: bayarea | california | westcoast | us
-  REGION=bayarea python3 scripts/build_leads_db.py # or via env var
+  python3 scripts/build_leads_db.py california       # built-in: sonoma | bayarea | california | westcoast | us
+  REGION=california python3 scripts/build_leads_db.py # or via env var
   REGION_NAME="North Bay" REGION_BBOX="38.0,-123.6,38.9,-122.3" \
     python3 scripts/build_leads_db.py              # custom box (south,west,north,east)
   ```

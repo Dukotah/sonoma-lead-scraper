@@ -38,13 +38,14 @@ except ImportError:
 
 # ---------------------------------------------------------------------------
 # Region config. Pick a region with `python build_leads_db.py <region>` or the
-# REGION env var (default: california). Add your own to REGIONS, or pass a custom
+# REGION env var (default: sonoma). Add your own to REGIONS, or pass a custom
 # box without editing this file:
 #     REGION_NAME="North Bay" REGION_BBOX="38.0,-123.6,38.9,-122.3" python build_leads_db.py
 # (bbox order is south,west,north,east -- grab numbers from https://bboxfinder.com)
 # Counts scale roughly with area; see the table in lead-tracker/README.md.
 # ---------------------------------------------------------------------------
 REGIONS = {
+    "sonoma":     ("Sonoma County",          {"south": 38.05, "west": -123.55, "north": 38.85, "east": -122.35}),
     "bayarea":    ("Bay Area + Wine Country", {"south": 36.85, "west": -124.05, "north": 40.05, "east": -121.45}),
     "california": ("California",              {"south": 32.50, "west": -124.50, "north": 42.05, "east": -114.10}),
     "westcoast":  ("West Coast (CA/OR/WA)",  {"south": 32.50, "west": -124.90, "north": 49.05, "east": -114.00}),
@@ -58,7 +59,7 @@ def select_region():
         s, w, n, e = (float(x) for x in os.environ["REGION_BBOX"].split(","))
         return (os.environ.get("REGION_NAME", "Custom region"),
                 {"south": s, "west": w, "north": n, "east": e})
-    key = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("REGION", "california")).lower()
+    key = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("REGION", "sonoma")).lower()
     if key not in REGIONS:
         sys.exit(f"Unknown region '{key}'. Choices: {', '.join(REGIONS)} "
                  f"(or set REGION_BBOX='south,west,north,east').")
