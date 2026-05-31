@@ -46,6 +46,12 @@ except ImportError:
 # ---------------------------------------------------------------------------
 REGIONS = {
     "sonoma":     ("Sonoma County",          {"south": 38.05, "west": -123.55, "north": 38.85, "east": -122.35}),
+    # Counties bordering Sonoma (clockwise from north): build each into its own DB.
+    "mendocino":  ("Mendocino County",       {"south": 38.75, "west": -123.95, "north": 40.00, "east": -122.82}),
+    "lake":       ("Lake County",            {"south": 38.65, "west": -123.10, "north": 39.60, "east": -122.32}),
+    "napa":       ("Napa County",            {"south": 38.15, "west": -122.65, "north": 38.87, "east": -122.06}),
+    "solano":     ("Solano County",          {"south": 38.03, "west": -122.41, "north": 38.54, "east": -121.59}),
+    "marin":      ("Marin County",           {"south": 37.80, "west": -122.92, "north": 38.32, "east": -122.43}),
     "bayarea":    ("Bay Area + Wine Country", {"south": 36.85, "west": -124.05, "north": 40.05, "east": -121.45}),
     "california": ("California",              {"south": 32.50, "west": -124.50, "north": 42.05, "east": -114.10}),
     "westcoast":  ("West Coast (CA/OR/WA)",  {"south": 32.50, "west": -124.90, "north": 49.05, "east": -114.00}),
@@ -95,7 +101,9 @@ WEAK_DOMAINS = [
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.normpath(os.path.join(HERE, "..", "data"))
 os.makedirs(DATA_DIR, exist_ok=True)
-DB_PATH = os.path.join(DATA_DIR, "leads.sqlite")
+# Output DB defaults to data/leads.sqlite, but set LEADS_DB to build a region
+# into its own file (e.g. LEADS_DB=data/napa.sqlite) without touching others.
+DB_PATH = os.environ.get("LEADS_DB", os.path.join(DATA_DIR, "leads.sqlite"))
 PARQUET_PATH = os.path.join(DATA_DIR, "region_places.parquet")
 CSV_PATH = os.path.join(DATA_DIR, "region_leads.csv")
 

@@ -83,10 +83,14 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
-    cols_sql = ", ".join(COLUMNS)
+    # Only select columns that actually exist. outreach_score / industry_fit are
+    # added by make_call_sheet.py; if it hasn't run, export the rest gracefully.
+    present = {r[1] for r in db.execute("PRAGMA table_info(leads)")}
+    cols = [c for c in COLUMNS if c in present]
+    order = "outreach_score DESC, " if "outreach_score" in present else (
+        "score DESC, " if "score" in present else "")
     rows = db.execute(
-        f"SELECT {cols_sql} FROM leads "
-        f"ORDER BY outreach_score DESC, category, name"
+        f"SELECT {', '.join(cols)} FROM leads ORDER BY {order}category, name"
     ).fetchall()
     n = len(rows)
 
@@ -94,15 +98,15 @@ def main():
     csv_path = os.path.join(OUT, "sonoma_leads_full.csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(COLUMNS)
+        w.writerow(cols)
         for r in rows:
-            w.writerow([r[c] for c in COLUMNS])
+            w.writerow([r[c] for c in cols])
 
     # JSONL
     jsonl_path = os.path.join(OUT, "sonoma_leads_full.jsonl")
     with open(jsonl_path, "w", encoding="utf-8") as fh:
         for r in rows:
-            fh.write(json.dumps({c: r[c] for c in COLUMNS}, ensure_ascii=False) + "\n")
+            fh.write(json.dumps({c: r[c] for c in cols}, ensure_ascii=False) + "\n")
 
     # niches.csv
     niches = db.execute(
@@ -151,7 +155,7 @@ def main():
               "upsert cleanly. All fields are text unless noted.\n")
     md.append("| Column | Fill % | Description |")
     md.append("|---|---|---|")
-    for c in COLUMNS:
+    for c in cols:
         md.append(f"| `{c}` | {fill(c)}% | {DOCS.get(c, '')} |")
     md.append("\n## Key value distributions\n")
     md.append("**tier** (website need):")
