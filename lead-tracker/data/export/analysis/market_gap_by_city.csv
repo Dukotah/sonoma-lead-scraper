@@ -1,0 +1,395 @@
+city,total,no_website,no_website_pct,warm_leads,with_phone,avg_outreach_score
+Santa Rosa,7413,1272,17.2,1116,7085,58.3
+Fairfield,2985,658,22.0,557,2813,58.5
+Napa,3897,676,17.3,555,3649,58.9
+Vallejo,2427,646,26.6,532,2246,58.5
+Vacaville,2619,503,19.2,474,2509,60.7
+San Rafael,3222,501,15.5,438,3100,57.8
+Petaluma,2774,444,16.0,395,2629,58.9
+Ukiah,1328,314,23.6,279,1282,59.9
+Novato,1830,267,14.6,229,1756,56.7
+Sonoma,1496,257,17.2,218,1411,60.6
+Rohnert Park,1100,240,21.8,213,1036,59.5
+Sebastopol,1122,177,15.8,167,1055,60.7
+Lakeport,660,181,27.4,166,629,61.1
+Benicia,1057,178,16.8,158,1002,60.0
+Healdsburg,1072,170,15.9,143,1012,61.3
+Fort Bragg,622,153,24.6,128,581,60.0
+Mill Valley,1148,150,13.1,121,1082,57.9
+Clearlake,400,118,29.5,108,383,58.6
+Dixon,535,124,23.2,105,499,58.3
+Windsor,673,126,18.7,103,638,60.2
+Suisun City,439,118,26.9,99,403,58.0
+Willits,406,109,26.8,96,386,60.0
+Sausalito,750,105,14.0,74,684,54.1
+Larkspur,575,78,13.6,67,555,56.9
+St Helena,390,99,25.4,65,341,61.5
+Cloverdale,291,69,23.7,63,270,59.5
+Middletown,202,71,35.1,62,188,62.5
+Kelseyville,288,74,25.7,59,264,57.9
+Calistoga,386,73,18.9,59,351,61.4
+American Canyon,368,76,20.7,59,342,57.2
+Cotati,369,58,15.7,58,355,61.8
+Rio Vista,231,66,28.6,52,213,59.6
+Greenbrae,500,55,11.0,50,481,53.8
+San Anselmo,445,52,11.7,48,428,59.9
+Winters,212,66,31.1,47,189,56.9
+Saint Helena,345,46,13.3,45,339,59.8
+Corte Madera,519,47,9.1,42,498,57.4
+San Francisco,527,72,13.7,37,464,52.3
+Redwood Valley,112,33,29.5,30,106,63.5
+Guerneville,231,44,19.0,30,208,57.4
+Mendocino,220,34,15.5,27,202,57.9
+Lower Lake,95,29,30.5,26,90,60.6
+Gualala,122,25,20.5,26,118,64.1
+Pittsburg,144,36,25.0,26,131,58.3
+Upper Lake,99,31,31.3,25,94,59.5
+Clearlake Oaks,85,26,30.6,23,80,62.9
+Fairfax,250,28,11.2,23,231,59.3
+Davis,242,42,17.4,21,188,38.3
+Penngrove,97,22,22.7,19,85,58.2
+Hidden Valley Lake,86,19,22.1,18,83,62.0
+Rodeo,69,29,42.0,18,59,52.4
+Laytonville,75,22,29.3,17,70,59.5
+Forestville,108,19,17.6,17,102,58.2
+Nice,55,19,34.5,16,52,60.5
+Lucerne,60,16,26.7,16,56,57.9
+Geyserville,124,20,16.1,14,108,55.5
+Potter Valley,48,14,29.2,14,47,63.8
+Hopland,84,20,23.8,14,77,61.0
+Glen Ellen,121,26,21.5,14,103,56.2
+Crockett,59,17,28.8,14,53,58.0
+Boonville,58,17,29.3,13,54,63.8
+SANTA ROSA,48,13,27.1,13,47,58.8
+Tiburon,169,17,10.1,12,155,55.0
+Point Reyes Station,109,26,23.9,12,87,48.4
+Point Arena,65,18,27.7,12,54,50.7
+Covelo,52,21,40.4,12,47,49.5
+Kenwood,78,15,19.2,12,71,61.9
+Cobb,43,14,32.6,11,38,59.4
+Yountville,156,30,19.2,11,134,53.0
+Monte Rio,46,11,23.9,11,41,60.1
+Angwin,84,17,20.2,10,72,48.6
+Kentfield,68,8,11.8,9,67,55.0
+SAN RAFAEL,27,8,29.6,8,27,57.2
+NAPA,23,8,34.8,8,23,58.4
+Occidental,67,15,22.4,8,58,51.8
+Fulton,36,11,30.6,8,31,54.6
+SEBASTOPOL,12,8,66.7,8,12,74.8
+Mendocino County,16,10,62.5,7,14,62.8
+Bolinas,48,14,29.2,7,37,43.5
+Belvedere Tiburon,34,5,14.7,6,34,60.9
+Elk,20,7,35.0,6,18,63.2
+Isleton,56,10,17.9,6,52,54.3
+VACAVILLE,13,6,46.2,6,13,68.6
+Nicasio,39,5,12.8,5,37,50.6
+Westport,18,8,44.4,5,13,51.1
+Philo,58,12,20.7,5,51,59.1
+FAIRFIELD,21,5,23.8,5,21,53.9
+Santa-Rosa,41,5,12.2,5,41,55.0
+Cazadero,41,8,19.5,5,36,50.1
+Belvedere,20,4,20.0,4,20,66.7
+Marshall,24,8,33.3,4,18,46.5
+NOVATO,11,4,36.4,4,11,61.5
+PETALUMA,17,6,35.3,4,17,55.4
+Albion,28,6,21.4,4,24,46.0
+The Sea Ranch,29,6,20.7,4,26,53.3
+Brooks,19,6,31.6,4,17,55.3
+Bay Point,13,4,30.8,4,12,56.4
+Travis Air Force Base,22,12,54.5,4,18,47.8
+Bodega Bay,103,18,17.5,4,84,48.6
+Jenner,34,7,20.6,4,29,50.5
+Graton,34,3,8.8,4,31,54.9
+WINDSOR,7,4,57.1,4,7,71.6
+Pope Valley,15,3,20.0,3,13,53.5
+(unknown),69,17,24.6,3,25,20.6
+Inverness,33,3,9.1,3,29,55.5
+Tomales,27,5,18.5,3,25,56.0
+Belvedere-Tiburon,37,5,13.5,3,33,57.8
+Woodacre,13,3,23.1,3,13,60.2
+Marin County,11,5,45.5,3,7,35.8
+Fair,3,3,100.0,3,3,78.3
+Little River,41,5,12.2,3,37,55.3
+Caspar,13,4,30.8,3,11,48.2
+Piercy,9,4,44.4,3,6,44.2
+Leggett,15,4,26.7,3,15,56.8
+Bodega,23,5,21.7,3,19,53.8
+Oakville,27,6,22.2,3,23,61.4
+VALLEJO,7,3,42.9,3,7,63.7
+Rio Nido,3,3,100.0,3,3,85.3
+ROHNERT PARK,10,3,30.0,3,10,59.7
+Stonyford,17,4,23.5,2,14,39.0
+Lake County,6,5,83.3,2,3,34.5
+SAUSALITO,4,2,50.0,2,4,65.5
+San-Rafael,19,2,10.5,2,19,56.3
+MILL VALLEY,3,2,66.7,2,3,74.0
+UKIAH,6,2,33.3,2,6,59.7
+Fort-Bragg,2,2,100.0,2,2,88.5
+Comptche,9,3,33.3,2,8,54.7
+Guinda,13,3,23.1,2,11,52.3
+Travis AFB,13,3,23.1,2,11,52.8
+Elmira,5,3,60.0,2,5,64.2
+SUISUN CITY,3,2,66.7,2,3,73.0
+Walnut Grove,11,3,27.3,2,10,55.6
+BENICIA,4,2,50.0,2,4,66.0
+Duncans Mills,17,2,11.8,2,16,61.8
+Freestone,4,2,50.0,2,4,79.0
+HEALDSBURG,3,2,66.7,2,3,62.7
+santa rosa,5,2,40.0,2,5,64.0
+Finley,1,1,100.0,1,1,100.0
+Willows,7,1,14.3,1,4,42.1
+Glenhaven,3,1,33.3,1,3,68.0
+Loch Lomond,1,1,100.0,1,1,98.0
+Colusa County,2,2,100.0,1,1,41.5
+Elk Creek,3,2,66.7,1,2,42.7
+Rajshahi,1,1,100.0,1,1,82.0
+Williams,2,2,100.0,1,1,40.5
+MIDDLETOWN,1,1,100.0,1,1,79.0
+Sonoma County,9,3,33.3,1,6,44.4
+Napa County,10,3,30.0,1,7,49.9
+Export,1,1,100.0,1,1,100.0
+Khalilabad,1,1,100.0,1,1,100.0
+Muir Beach,5,1,20.0,1,4,44.0
+Concord,14,1,7.1,1,13,49.4
+Lagunitas,18,1,5.6,1,18,60.7
+Ross,39,2,5.1,1,36,54.8
+San Geronimo,9,2,22.2,1,9,57.7
+South San Francisco,2,1,50.0,1,2,62.0
+East Petaluma,1,1,100.0,1,1,81.0
+Contra Costa County,1,1,100.0,1,1,81.0
+Pt. Reyes Station,1,1,100.0,1,1,79.0
+san rafael,2,1,50.0,1,2,61.0
+Forest Knolls,12,1,8.3,1,12,62.4
+CORTE MADERA,1,1,100.0,1,1,79.0
+Stinson Beach,26,6,23.1,1,21,47.5
+LARKSPUR,2,1,50.0,1,2,60.0
+SAN ANSELMO,2,1,50.0,1,2,70.5
+Stinson-Beach,1,1,100.0,1,1,77.0
+Richmond,2,1,50.0,1,2,88.5
+Manchester,16,5,31.2,1,10,31.6
+Yorkville,11,1,9.1,1,11,70.9
+CA,1,1,100.0,1,1,92.0
+FORT BRAGG,2,1,50.0,1,2,61.5
+WILLITS,1,1,100.0,1,1,78.0
+Seattle,2,1,50.0,1,2,48.5
+Woodland,2,1,50.0,1,2,71.5
+Rutherford,24,6,25.0,1,17,49.9
+CALISTOGA,1,1,100.0,1,1,99.0
+Capay,10,3,30.0,1,8,45.6
+Solano County,8,3,37.5,1,6,39.9
+Sacramento,9,1,11.1,1,7,56.0
+Port Costa,11,4,36.4,1,6,41.4
+El Cerrito,1,1,100.0,1,1,100.0
+Batavia,1,1,100.0,1,1,100.0
+Galveston,1,1,100.0,1,1,100.0
+Wilton,1,1,100.0,1,1,100.0
+DIXON,2,1,50.0,1,2,71.5
+Arcadia,1,1,100.0,1,1,93.0
+"Vallejo, CA, US",2,1,50.0,1,2,73.0
+Grass Valley,1,0,0.0,1,1,82.0
+Oakley,1,1,100.0,1,1,81.0
+Antioch,1,0,0.0,1,1,81.0
+Gilroy,1,1,100.0,1,1,78.0
+fairfield,2,1,50.0,1,2,61.0
+#109,1,1,100.0,1,1,78.0
+Hercules,1,1,100.0,1,1,77.0
+Rio vista,1,0,0.0,1,1,72.0
+Berkeley,2,1,50.0,1,2,78.0
+Dillon Beach,11,2,18.2,1,8,46.1
+Valley Ford,12,1,8.3,1,12,68.8
+"Rohnert Park, CA, US",2,2,100.0,1,2,75.0
+Valeey Ford,1,1,100.0,1,1,100.0
+Larkfield,3,1,33.3,1,3,55.0
+Lynchburg,1,0,0.0,0,1,77.0
+"Lakeport, CA",1,0,0.0,0,1,77.0
+Jimtown,1,0,0.0,0,1,74.0
+Kelsyville,1,0,0.0,0,1,66.0
+CLEARLAKE,2,0,0.0,0,2,54.0
+NICE,2,0,0.0,0,2,63.5
+LAKEPORT,4,0,0.0,0,4,48.5
+Oakland,3,0,0.0,0,3,56.0
+Witter Springs,2,0,0.0,0,2,51.5
+Glenn County,2,1,50.0,0,1,28.5
+Lake Pillsbury Ranch,1,0,0.0,0,1,56.0
+Arlington,1,0,0.0,0,1,56.0
+Palm Springs,2,0,0.0,0,2,49.0
+Coverdale,1,0,0.0,0,1,44.0
+Lower-Lake,2,0,0.0,0,2,43.5
+Warwick,1,0,0.0,0,1,43.0
+Clearlake-Oaks,1,0,0.0,0,1,43.0
+Corvallis,1,0,0.0,0,1,20.0
+Los Angeles,2,2,100.0,0,0,0.0
+Alamo,1,0,0.0,0,0,0.0
+Mercuryville,1,1,100.0,0,0,0.0
+Pleasanton Valley,1,0,0.0,0,0,0.0
+Knoxville,1,1,100.0,0,0,0.0
+Olema,6,0,0.0,0,5,51.3
+"Petaluma, CA, US",1,0,0.0,0,1,76.0
+90005,1,0,0.0,0,1,76.0
+Monterey,3,0,0.0,0,3,74.0
+San Quentin,4,0,0.0,0,2,22.5
+novato,1,0,0.0,0,1,74.0
+Glen Cove,1,0,0.0,0,1,74.0
+olema,1,0,0.0,0,1,73.0
+"San Rafael, CA, US",1,0,0.0,0,1,67.0
+sonoma,1,0,0.0,0,1,64.0
+SONOMA,6,0,0.0,0,6,53.2
+San Pablo,1,0,0.0,0,1,64.0
+san anselmo,1,0,0.0,0,1,63.0
+"Novato, CA",1,0,0.0,0,1,63.0
+South Lake Tahoe,1,0,0.0,0,1,57.0
+Chicago,1,0,0.0,0,1,54.0
+Marin,2,0,0.0,0,2,48.0
+Marin City,1,0,0.0,0,1,53.0
+SAN FRANCISCO,1,1,100.0,0,1,46.0
+ROSS,1,1,100.0,0,1,46.0
+Westlake Village,1,0,0.0,0,1,46.0
+GREENBRAE,1,1,100.0,0,1,45.0
+White Haven,1,0,0.0,0,1,44.0
+869 Grant ave.,1,0,0.0,0,1,44.0
+Corte-Madera,1,0,0.0,0,1,44.0
+Pt Reyes Sta,1,0,0.0,0,1,44.0
+Mill-Valley,1,0,0.0,0,1,43.0
+Charleston,1,0,0.0,0,1,43.0
+Pt Reyes Station,1,0,0.0,0,1,43.0
+Pinole,1,0,0.0,0,1,43.0
+Petuluma,1,0,0.0,0,1,43.0
+Austin,1,0,0.0,0,1,43.0
+San-Anselmo,1,0,0.0,0,1,43.0
+Point Reyes,1,0,0.0,0,1,43.0
+Denver,1,0,0.0,0,1,43.0
+FAIRFAX,1,0,0.0,0,1,42.0
+Del Sur,1,0,0.0,0,1,42.0
+"San Rafael, CA",1,0,0.0,0,1,42.0
+Sun Valley,1,0,0.0,0,1,42.0
+"Fairfax, CA, US",1,0,0.0,0,1,23.0
+"Ross, CA, US",1,0,0.0,0,1,23.0
+Boyes Hot Springs,1,0,0.0,0,1,10.0
+Santa Clara,1,1,100.0,0,0,0.0
+Albuquerque,1,0,0.0,0,0,0.0
+San Rafeal,1,1,100.0,0,0,0.0
+Dos Rios,3,0,0.0,0,3,58.7
+GUALALA,1,0,0.0,0,1,76.0
+Redwood-Potter Valley,1,0,0.0,0,1,73.0
+Booneville,1,0,0.0,0,1,67.0
+Point arena,2,0,0.0,0,2,61.5
+Littleriver,2,0,0.0,0,2,64.0
+San Jose,1,0,0.0,0,1,63.0
+Talmage,1,0,0.0,0,1,63.0
+Ukaih,2,0,0.0,0,2,53.0
+Mendocino-Anderson,1,0,0.0,0,1,63.0
+gualala,1,0,0.0,0,1,56.0
+Osmond,1,0,0.0,0,1,55.0
+Branscomb,3,1,33.3,0,2,30.0
+"Fort Bragg, CA",1,0,0.0,0,1,46.0
+Calpella,1,0,0.0,0,1,44.0
+Ft Bragg,2,0,0.0,0,2,43.5
+Ulkiah,1,0,0.0,0,1,44.0
+Arnold,1,0,0.0,0,1,43.0
+Lodi,1,0,0.0,0,1,43.0
+York,1,0,0.0,0,1,43.0
+"Ukiah, CA, US",1,0,0.0,0,1,10.0
+Münchenstein,1,0,0.0,0,0,0.0
+Dubai,1,0,0.0,0,0,0.0
+Malibu,1,1,100.0,0,0,0.0
+Navarro,1,1,100.0,0,0,0.0
+St. Helena,46,0,0.0,0,46,48.0
+Cordelia,5,0,0.0,0,5,56.2
+Napa Valley,2,0,0.0,0,2,54.5
+"St Helena,",1,0,0.0,0,1,64.0
+City of Napa,1,0,0.0,0,1,64.0
+East Fairfield,1,0,0.0,0,1,64.0
+American-Canyon,2,0,0.0,0,2,54.0
+Venice,1,0,0.0,0,1,63.0
+Pleasant Hill,1,0,0.0,0,1,63.0
+Deer Park,5,0,0.0,0,4,26.6
+Esparto,2,0,0.0,0,2,50.5
+Eldridge,2,0,0.0,0,2,40.0
+Woodleaf,1,0,0.0,0,1,57.0
+"St. Helena, CA, US",1,0,0.0,0,1,57.0
+SAINT HELENA,2,0,0.0,0,2,49.0
+"Yountville, CA, US",1,0,0.0,0,1,54.0
+"Napa, CA, US",2,0,0.0,0,2,45.0
+Calistago,1,0,0.0,0,1,44.0
+AMERICAN CANYON,4,0,0.0,0,4,43.5
+American Cyn,1,0,0.0,0,1,43.0
+napa,1,0,0.0,0,1,43.0
+Agua Caliente,1,0,0.0,0,1,43.0
+Hayward,1,0,0.0,0,1,43.0
+#StHelena,1,0,0.0,0,1,24.0
+"Sonoma, CA, US",1,0,0.0,0,1,23.0
+Bakersfield,1,0,0.0,0,1,11.0
+Plymouth,1,0,0.0,0,0,0.0
+Bethel Island,7,1,14.3,0,6,48.3
+Travis Afb,5,0,0.0,0,4,45.6
+Palmer,1,0,0.0,0,1,76.0
+Carson,1,0,0.0,0,1,76.0
+Red Bluff,1,0,0.0,0,1,76.0
+Martinez,3,0,0.0,0,3,53.3
+Bayfield,1,0,0.0,0,1,74.0
+Walnut Creek,1,0,0.0,0,1,73.0
+Chambersburg,1,0,0.0,0,1,64.0
+Winchester,1,0,0.0,0,1,64.0
+Antelope,1,0,0.0,0,1,64.0
+BAY POINT,1,0,0.0,0,1,63.0
+RIO VISTA,1,0,0.0,0,1,63.0
+vacaville,2,0,0.0,0,2,53.0
+Vavaville,1,0,0.0,0,1,63.0
+Arbuckle,1,0,0.0,0,1,56.0
+Suisun,4,0,0.0,0,4,43.8
+"Vacaville, CA, US",1,0,0.0,0,1,47.0
+Benecia,2,0,0.0,0,2,43.5
+Suisun-City,1,0,0.0,0,1,44.0
+Norton,1,0,0.0,0,1,43.0
+Valejo,1,0,0.0,0,1,43.0
+Vallejo CA,1,0,0.0,0,1,43.0
+sacramento,1,0,0.0,0,1,43.0
+Omaha,1,0,0.0,0,1,43.0
+Lancaster,1,0,0.0,0,1,43.0
+Stuart,1,0,0.0,0,1,43.0
+Carmichael,1,0,0.0,0,1,43.0
+Rocklin,1,0,0.0,0,1,43.0
+Melbourne,1,0,0.0,0,1,43.0
+West Sacramento,1,0,0.0,0,1,42.0
+Sámara,1,0,0.0,0,1,42.0
+Las Vegas,1,0,0.0,0,0,0.0
+Woodinville,1,0,0.0,0,0,0.0
+Naperville,1,0,0.0,0,0,0.0
+Santa Barbara,1,0,0.0,0,0,0.0
+Edison,1,0,0.0,0,0,0.0
+Clarksburg,1,1,100.0,0,0,0.0
+Birds Landing,1,0,0.0,0,0,0.0
+Mare Island,1,0,0.0,0,0,0.0
+Stewarts Point,3,0,0.0,0,3,62.0
+Sunnyside,1,0,0.0,0,1,77.0
+Bridgehaven,1,0,0.0,0,1,77.0
+"Santa Rosa, Bennett Valley",1,0,0.0,0,1,76.0
+Camp Meeker,5,1,20.0,0,4,45.8
+Simi Valley,1,0,0.0,0,1,74.0
+Rohnert-Park,7,0,0.0,0,7,56.0
+"Santa Rosa,",2,0,0.0,0,2,54.0
+Alts De Santa Barbara,1,0,0.0,0,1,64.0
+Annapolis,5,0,0.0,0,5,49.8
+Sea ranch,1,0,0.0,0,1,63.0
+THE SEA RANCH,1,0,0.0,0,1,63.0
+OCCIDENTAL,2,0,0.0,0,2,63.0
+Larkfield-Wikiup,1,0,0.0,0,1,63.0
+Chalfont,1,0,0.0,0,1,63.0
+Waco,1,0,0.0,0,1,56.0
+"Sebastopol, CA, US",2,0,0.0,0,2,49.0
+"Santa Rosa, CA, US",1,0,0.0,0,1,54.0
+Santa rosa,2,0,0.0,0,2,47.5
+guerneville,1,0,0.0,0,1,47.0
+Birdsboro,1,0,0.0,0,1,43.0
+Downey,1,0,0.0,0,1,43.0
+Redding,1,0,0.0,0,1,43.0
+Rohnert park,1,0,0.0,0,1,43.0
+COTATI,1,0,0.0,0,1,42.0
+bodega bay,1,0,0.0,0,1,42.0
+Sebastopol- inside Lashey Lady Studio,1,0,0.0,0,1,42.0
+Gurenville,1,0,0.0,0,1,42.0
+Turlock,1,0,0.0,0,1,10.0
+Sea Ranch,1,0,0.0,0,0,0.0
+New York,1,0,0.0,0,0,0.0
+Villa Grande,1,1,100.0,0,0,0.0
+Las Lomas,1,1,100.0,0,0,0.0
