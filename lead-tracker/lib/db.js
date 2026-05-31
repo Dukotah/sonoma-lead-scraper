@@ -21,6 +21,21 @@ export function getDb() {
     favorite INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT
   )`);
+  // Live-audit results, written by scripts/audit_websites.py (run locally where
+  // outbound HTTP is allowed). Kept in its own table so it survives data rebuilds,
+  // same as crm. create-if-missing so the app works before any audit has run.
+  _db.exec(`CREATE TABLE IF NOT EXISTS audit (
+    lead_id TEXT PRIMARY KEY,
+    http_status INTEGER,
+    https INTEGER,
+    mobile INTEGER,
+    load_ms INTEGER,
+    builder_live TEXT,
+    title TEXT,
+    audit_grade TEXT,
+    error TEXT,
+    checked_at TEXT
+  )`);
   return _db;
 }
 
@@ -30,6 +45,7 @@ const SORTS = {
   name: "l.name",
   city: "l.city",
   category: "l.category",
+  score: "l.score",
   updated: "c.updated_at",
 };
 
@@ -72,6 +88,18 @@ function buildFilter(p) {
   if (p.hasWebsite === "yes") where.push("l.website IS NOT NULL AND l.website <> ''");
   if (p.hasWebsite === "no") where.push("(l.website IS NULL OR l.website = '')");
   if (p.hasPhone === "yes") where.push("l.phone IS NOT NULL AND l.phone <> ''");
+  if (p.hasEmail === "yes") where.push("l.email IS NOT NULL AND l.email <> ''");
+  if (p.builder) {
+    where.push("l.builder = @builder");
+    params.builder = p.builder;
+  }
+  if (p.minScore) {
+    const ms = parseInt(p.minScore);
+    if (!Number.isNaN(ms)) {
+      where.push("l.score >= @minScore");
+      params.minScore = ms;
+    }
+  }
   if (p.favorite === "1" || p.favorite === true)
     where.push("COALESCE(c.favorite, 0) = 1");
 
@@ -81,33 +109,47 @@ function buildFilter(p) {
 const SELECT_COLS = `
   l.id, l.name, l.category, l.city, l.address, l.phone, l.website, l.email,
   l.socials, l.tier, l.tier_reason, l.lat, l.lon,
+  l.score, l.builder, l.phone_fmt, l.area_code, l.social_platforms,
+  l.email_owned, l.completeness, l.best_contact, l.pitch,
+  a.http_status AS audit_status, a.https AS audit_https, a.mobile AS audit_mobile,
+  a.load_ms AS audit_load_ms, a.builder_live AS audit_builder,
+  a.audit_grade, a.error AS audit_error, a.checked_at AS audit_checked_at,
   COALESCE(c.status, 'New') AS status,
   c.notes, c.last_contacted,
   COALESCE(c.favorite, 0) AS favorite,
   c.updated_at`;
+
+// Every read joins crm (tracking) + audit (live website results) onto leads.
+const FROM_JOINS = `
+  FROM leads l
+  LEFT JOIN crm c ON c.lead_id = l.id
+  LEFT JOIN audit a ON a.lead_id = l.id`;
 
 export function queryLeads(p = {}) {
   const db = getDb();
   const { where, params } = buildFilter(p);
 
   const total = db
-    .prepare(`SELECT COUNT(*) n FROM leads l LEFT JOIN crm c ON c.lead_id = l.id ${where}`)
+    .prepare(`SELECT COUNT(*) n ${FROM_JOINS} ${where}`)
     .get(params).n;
 
   const page = Math.max(1, parseInt(p.page) || 1);
   const pageSize = Math.min(200, Math.max(1, parseInt(p.pageSize) || 50));
   const sortCol = SORTS[p.sort] || "l.tier";
   const order = String(p.order).toLowerCase() === "desc" ? "DESC" : "ASC";
-  // Stable, sensible secondary ordering; NULL updated_at sorts last.
-  const orderBy =
-    p.sort === "updated"
-      ? `c.updated_at IS NULL, c.updated_at ${order}`
-      : `${sortCol} ${order}, l.name ASC`;
+  // Stable, sensible secondary ordering; NULLs sort last for score/updated.
+  let orderBy;
+  if (p.sort === "updated") {
+    orderBy = `c.updated_at IS NULL, c.updated_at ${order}`;
+  } else if (p.sort === "score") {
+    orderBy = `l.score IS NULL, l.score ${order}, l.name ASC`;
+  } else {
+    orderBy = `${sortCol} ${order}, l.name ASC`;
+  }
 
   const rows = db
     .prepare(
-      `SELECT ${SELECT_COLS}
-       FROM leads l LEFT JOIN crm c ON c.lead_id = l.id
+      `SELECT ${SELECT_COLS} ${FROM_JOINS}
        ${where} ORDER BY ${orderBy}
        LIMIT @_limit OFFSET @_offset`
     )
@@ -122,9 +164,8 @@ export function exportLeads(p = {}) {
   const { where, params } = buildFilter(p);
   return db
     .prepare(
-      `SELECT ${SELECT_COLS}
-       FROM leads l LEFT JOIN crm c ON c.lead_id = l.id
-       ${where} ORDER BY l.tier ASC, l.city ASC, l.name ASC`
+      `SELECT ${SELECT_COLS} ${FROM_JOINS}
+       ${where} ORDER BY l.score IS NULL, l.score DESC, l.name ASC`
     )
     .all(params);
 }
@@ -143,16 +184,26 @@ export function getFacets() {
         "GROUP BY category ORDER BY n DESC LIMIT 300"
     )
     .all();
-  return { cities, categories, statuses: STATUSES };
+  const builders = db
+    .prepare(
+      "SELECT builder, COUNT(*) n FROM leads WHERE builder IS NOT NULL AND builder <> '' " +
+        "GROUP BY builder ORDER BY n DESC"
+    )
+    .all();
+  return { cities, categories, builders, statuses: STATUSES };
 }
 
 export function getStats() {
   const db = getDb();
   const total = db.prepare("SELECT COUNT(*) n FROM leads").get().n;
   const tierA = db.prepare("SELECT COUNT(*) n FROM leads WHERE tier = 'A'").get().n;
+  const tierB = db.prepare("SELECT COUNT(*) n FROM leads WHERE tier = 'B'").get().n;
+  const tierC = db.prepare("SELECT COUNT(*) n FROM leads WHERE tier = 'C'").get().n;
   const withPhone = db
     .prepare("SELECT COUNT(*) n FROM leads WHERE phone IS NOT NULL AND phone <> ''")
     .get().n;
+  const avgScore = db.prepare("SELECT ROUND(AVG(score),1) v FROM leads").get().v;
+  const audited = db.prepare("SELECT COUNT(*) n FROM audit").get().n;
   const byStatus = db
     .prepare(
       `SELECT COALESCE(c.status, 'New') status, COUNT(*) n
@@ -164,7 +215,7 @@ export function getStats() {
   const status = {};
   for (const s of STATUSES) status[s] = 0;
   for (const r of byStatus) status[r.status] = r.n;
-  return { total, tierA, withPhone, favorites, status };
+  return { total, tierA, tierB, tierC, withPhone, avgScore, audited, favorites, status };
 }
 
 // Partial update of a lead's CRM state. Only provided keys change; pass notes:""

@@ -4,8 +4,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const FIELDS = [
-  "name", "category", "city", "address", "phone", "website", "email",
-  "tier", "tier_reason", "status", "notes", "last_contacted", "favorite",
+  "name", "category", "city", "address",
+  "phone", "phone_fmt", "area_code", "website", "email", "email_owned",
+  "social_platforms", "best_contact",
+  "tier", "tier_reason", "builder", "score", "completeness", "pitch",
+  "audit_status", "audit_https", "audit_mobile", "audit_load_ms",
+  "audit_builder", "audit_grade", "audit_error", "audit_checked_at",
+  "status", "notes", "last_contacted", "favorite",
   "lat", "lon", "id",
 ];
 

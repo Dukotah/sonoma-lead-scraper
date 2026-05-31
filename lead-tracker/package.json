@@ -7,7 +7,9 @@
     "dev": "next dev -p 3030",
     "build": "next build",
     "start": "next start -p 3030",
-    "build-db": "python3 scripts/build_leads_db.py"
+    "build-db": "python3 scripts/build_leads_db.py",
+    "enrich": "python3 scripts/enrich_leads.py",
+    "audit": "python3 scripts/audit_websites.py"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

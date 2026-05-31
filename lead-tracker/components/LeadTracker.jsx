@@ -3,7 +3,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STATUSES = ["New", "Contacted", "Quoted", "Won", "Lost"];
-const TIER_LABEL = { A: "A · hot", C: "C · has site" };
+const TIER_LABEL = { A: "A · hot", B: "B · DIY site", C: "C · has site" };
+
+// Color band for the score chip.
+function scoreBand(s) {
+  if (s == null) return "na";
+  if (s >= 80) return "hi";
+  if (s >= 55) return "mid";
+  return "lo";
+}
+
+// Tooltip summarizing live-audit results, if this lead has been audited.
+function auditTitle(r) {
+  if (!r.audit_grade) return undefined;
+  const bits = [];
+  if (r.audit_status) bits.push(`HTTP ${r.audit_status}`);
+  bits.push(r.audit_https ? "HTTPS" : "no HTTPS");
+  bits.push(r.audit_mobile ? "mobile-friendly" : "not mobile");
+  if (r.audit_load_ms != null) bits.push(`${r.audit_load_ms}ms`);
+  if (r.audit_builder) bits.push(`built on ${r.audit_builder}`);
+  if (r.audit_error) bits.push(r.audit_error);
+  return `Live audit: ${bits.join(" · ")}`;
+}
 
 function useDebounced(value, ms) {
   const [v, setV] = useState(value);
@@ -17,7 +38,7 @@ function useDebounced(value, ms) {
 export default function LeadTracker() {
   const [filters, setFilters] = useState({
     q: "", city: "", category: "", tier: "", status: "",
-    hasWebsite: "", hasPhone: "", favorite: "",
+    hasWebsite: "", hasPhone: "", favorite: "", builder: "", minScore: "",
   });
   const [sort, setSort] = useState({ sort: "tier", order: "asc" });
   const [page, setPage] = useState(1);
@@ -87,7 +108,7 @@ export default function LeadTracker() {
 
   const clearFilters = () =>
     setFilters({ q: "", city: "", category: "", tier: "", status: "",
-      hasWebsite: "", hasPhone: "", favorite: "" });
+      hasWebsite: "", hasPhone: "", favorite: "", builder: "", minScore: "" });
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
@@ -99,7 +120,9 @@ export default function LeadTracker() {
           <div className="lt-stats">
             <Stat label="Leads" value={stats.total} />
             <Stat label="Tier A (hot)" value={stats.tierA} accent />
+            <Stat label="Tier B (DIY)" value={stats.tierB} />
             <Stat label="With phone" value={stats.withPhone} />
+            <Stat label="Avg score" value={stats.avgScore} />
             <Stat label="★ Favorites" value={stats.favorites} />
             <span className="lt-pipe">
               {STATUSES.map((s) => (
@@ -139,7 +162,20 @@ export default function LeadTracker() {
         <select value={filters.tier} onChange={(e) => setF("tier", e.target.value)}>
           <option value="">Any tier</option>
           <option value="A">A · no/weak site (hot)</option>
+          <option value="B">B · DIY builder (upsell)</option>
           <option value="C">C · has a website</option>
+        </select>
+        <select value={filters.builder} onChange={(e) => setF("builder", e.target.value)}>
+          <option value="">Any builder</option>
+          {(facets.builders || []).map((b) => (
+            <option key={b.builder} value={b.builder}>{b.builder} ({b.n})</option>
+          ))}
+        </select>
+        <select value={filters.minScore} onChange={(e) => setF("minScore", e.target.value)}>
+          <option value="">Any score</option>
+          <option value="90">Score ≥ 90</option>
+          <option value="75">Score ≥ 75</option>
+          <option value="50">Score ≥ 50</option>
         </select>
         <select value={filters.hasWebsite} onChange={(e) => setF("hasWebsite", e.target.value)}>
           <option value="">Website: any</option>
@@ -177,6 +213,7 @@ export default function LeadTracker() {
             <Th label="Phone" />
             <Th label="Website" />
             <Th label="Tier" col="tier" sort={sort} setSort={setSort} />
+            <Th label="Score" col="score" sort={sort} setSort={setSort} />
             <Th label="Status" />
             <Th label="Notes" />
           </tr>
@@ -187,7 +224,7 @@ export default function LeadTracker() {
               openNotes={openNotes} setOpenNotes={setOpenNotes} />
           ))}
           {!loading && data.rows.length === 0 && (
-            <tr><td colSpan={9} className="lt-empty">No leads match these filters.</td></tr>
+            <tr><td colSpan={10} className="lt-empty">No leads match these filters.</td></tr>
           )}
         </tbody>
       </table>
@@ -251,14 +288,21 @@ function Row({ r, patchLead, openNotes, setOpenNotes }) {
         </td>
         <td>{r.category || "—"}</td>
         <td>{r.city || "—"}</td>
-        <td>{r.phone ? <a href={`tel:${r.phone}`}>{r.phone}</a> : "—"}</td>
+        <td>{r.phone ? <a href={`tel:${r.phone}`}>{r.phone_fmt || r.phone}</a> : "—"}
+          {r.best_contact && r.best_contact !== "none" && r.best_contact !== "phone" &&
+            <div className="lt-best">via {r.best_contact}</div>}
+        </td>
         <td className="lt-web">
           {website
             ? <a href={websiteUrl} target="_blank" rel="noreferrer">{website.replace(/^https?:\/\//, "")}</a>
             : <span className="lt-none" title={r.tier_reason}>none</span>}
         </td>
         <td><span className={`lt-tier t-${r.tier?.toLowerCase()}`} title={r.tier_reason}>
-          {TIER_LABEL[r.tier] || r.tier}</span></td>
+          {TIER_LABEL[r.tier] || r.tier}</span>
+          {r.builder && <span className="lt-builder" title={`Built on ${r.builder}`}>{r.builder}</span>}
+          {r.audit_grade && <span className={`lt-audit g-${r.audit_grade}`} title={auditTitle(r)}>{r.audit_grade}</span>}
+        </td>
+        <td><span className={`lt-score sc-${scoreBand(r.score)}`} title="Lead priority 0–100">{r.score ?? "—"}</span></td>
         <td>
           <select className={`lt-status s-${r.status?.toLowerCase()}`}
             value={r.status}
@@ -275,7 +319,15 @@ function Row({ r, patchLead, openNotes, setOpenNotes }) {
       </tr>
       {isOpen && (
         <tr className="lt-notes-row">
-          <td colSpan={9}>
+          <td colSpan={10}>
+            {r.pitch && (
+              <div className="lt-pitch">
+                <div className="lt-pitch-label">Suggested pitch</div>
+                <p className="lt-pitch-text">{r.pitch}</p>
+                <button className="lt-copy"
+                  onClick={() => navigator.clipboard?.writeText(r.pitch)}>Copy</button>
+              </div>
+            )}
             <div className="lt-notes-edit">
               <textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)}
                 placeholder="Call notes, pitch angle, follow-up date…" />

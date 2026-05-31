@@ -255,6 +255,15 @@ CREATE TABLE IF NOT EXISTS crm (
   updated_at     TEXT
 )
 """)
+# Live website-audit results (filled by scripts/audit_websites.py, run locally).
+# Preserved across rebuilds, like crm.
+db.execute("""
+CREATE TABLE IF NOT EXISTS audit (
+  lead_id      TEXT PRIMARY KEY,
+  http_status  INTEGER, https INTEGER, mobile INTEGER, load_ms INTEGER,
+  builder_live TEXT, title TEXT, audit_grade TEXT, error TEXT, checked_at TEXT
+)
+""")
 db.execute("DROP TABLE IF EXISTS leads")
 db.execute(f"""
 CREATE TABLE leads (
@@ -293,8 +302,9 @@ db.execute("CREATE VIRTUAL TABLE leads_fts USING fts5("
 db.execute("INSERT INTO leads_fts(rowid, name, category, city, address) "
            "SELECT rowid, name, category, city, address FROM leads")
 
-# Drop any crm rows whose lead no longer exists after a refresh.
+# Drop any crm/audit rows whose lead no longer exists after a refresh.
 db.execute("DELETE FROM crm WHERE lead_id NOT IN (SELECT id FROM leads)")
+db.execute("DELETE FROM audit WHERE lead_id NOT IN (SELECT id FROM leads)")
 db.commit()
 
 n_leads = db.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
@@ -313,3 +323,14 @@ print(f"    leads : {n_leads:,}  (Tier A: {n_a:,}, with phone: {n_phone:,})")
 print(f"    crm   : {n_crm:,} tracking rows preserved")
 print(f"  {PARQUET_PATH}  ({raw_n:,} raw records)")
 print(f"  {CSV_PATH}")
+
+# Offline enrichment: re-tier (A/B/C incl. DIY builders), score, format phones,
+# build pitches, etc. Runs automatically so a fresh build is fully enriched.
+print("\nEnriching (offline: tiers, scores, pitches, normalized contacts)...")
+try:
+    import enrich_leads
+    enrich_leads.DB_PATH = DB_PATH
+    enrich_leads.main()
+except Exception as e:
+    print(f"  (enrichment step skipped: {type(e).__name__}: {e})")
+    print("  Run it manually with:  python scripts/enrich_leads.py")
