@@ -1,6 +1,6 @@
 """
 HTTP + website auditing — shared, vertical-agnostic. Consolidated from the proven
-logic in data-kit/lead_tools.py and scraper-gui/app.py (polite UA, timeout,
+logic in data-kit/lead_tools.py and legacy/scraper-gui/app.py (polite UA, timeout,
 retry, builder/SSL/mobile checks) so every vertical fetches the same safe way.
 """
 from __future__ import annotations

@@ -1,131 +1,118 @@
 # Lead Scraper Toolkit
 
+Two tools, one job: **fill a pipeline with web-design (and other) leads, then work
+them until they're customers.** Everything runs on your own machine off free public
+data — no accounts, no API keys.
+
+1. **🔍 Find new leads** — scrape the web for fresh prospects, audit their sites, score them, export.
+2. **📇 Work your leads** — browse everything you've collected in a fast local CRM: filter, take notes, track status, call through the list.
+
+The easiest way to use both is the **`LeadEngine` desktop app** (`gui/`, shippable as a
+single Windows `.exe`) — it has a tab for each. Power users can drive each tool directly.
+
+---
+
+## Tool 1 — Find new leads  (`leadgen/`)
+
 A **universal lead-generation engine**: one pipeline (collect → dedupe → enrich →
 suppress → score → export) driven by swappable **verticals**, where a vertical
-defines *what* you're prospecting for and *how* to score it. Ships with two
-verticals — transaction-coordinator leads (for [simplytc.com](https://simplytc.com))
-and the original web-design leads — plus the GUI and bulk-data tools below.
-
-## The engine — `leadgen/`
+defines *what* you're prospecting for and *how* to score it. Ships with two —
+transaction-coordinator leads (for [simplytc.com](https://simplytc.com)) and the
+original web-design leads.
 
 ```bash
 pip install -r leadgen/requirements.txt
 
 python -m leadgen --list                     # show available verticals
-# Transaction-coordinator leads for SimplyTC:
-python -m leadgen --vertical simply_tc --market sonoma_county_ca --out sonoma_tc
-# Any geocodable place works as a market:
+# Web-design leads in Sonoma County:
+python -m leadgen --vertical web_design --market sonoma_county_ca --out sonoma_web
+# Transaction-coordinator leads for SimplyTC; any geocodable place is a market:
 python -m leadgen --vertical simply_tc --market "Austin, Texas" --sources overture osm
-# Original web-design use case, same engine:
-python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich
 ```
 
-Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`.
+Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`. Tests:
+`python leadgen/tests/test_engine.py`.
 
-### Point-and-click GUI — `gui/`
+**Add a use case** = one file in `leadgen/verticals/` calling `register(Vertical(...))`
+with a `score_fn` (and optional `enrich_fn`, `opener_fn`, `suppression_fn`). The
+`simply_tc` vertical shows the full pattern, including **competitor suppression** —
+scraping a rival's published client list to drop prospects who already use them. See
+`leadgen/verticals/simply_tc.py` and `simplytc/DESIGN.md`.
 
-No command line needed: pick a vertical + market, paste competitor pages to skip,
-upload your CRM to de-dupe, hit Run, watch live progress, download the CSV/XLSX.
-Built for a non-technical user:
+## Tool 2 — Work your leads  (`lead-tracker/`)
 
-- **Try a demo** — a full sample run with **no internet**, so you see real output first.
-- **Check my connection** — tests each data source and says, in plain English,
-  what works before you waste a run.
-- **Skip people already in your CRM** — upload a CSV; matches are removed, never duplicated.
-- **Friendly errors** — guidance instead of tracebacks.
+A **CRM-lite** for actually working the list: a fast, filterable table over a whole
+region's businesses, with a per-lead status pipeline, notes, favorites, and CSV
+export. A Next.js (App Router) app backed by a local **SQLite** file — single-user,
+runs entirely on your machine.
+
+```bash
+cd lead-tracker
+npm install
+npm run build-db sonoma     # build the region dataset (default: Sonoma County)
+npm run dev                 # open http://localhost:3030
+```
+
+The dataset is **region-parameterized** (`sonoma` → `bayarea` → `california` →
+`us`); SQLite stays snappy into the low millions of rows. Business records come from
+[Overture Maps](https://overturemaps.org) (open Meta/Microsoft/Amazon dataset,
+CC-BY 4.0). See [`lead-tracker/README.md`](lead-tracker/README.md).
+
+## The desktop app — both tools, no setup  (`gui/`)
+
+`LeadEngine` wraps both tools in one point-and-click window built for a
+non-technical user: a **📇 Browse all leads** tab (Tool 2, over the bundled dataset)
+and a **🔍 Find new leads** tab (Tool 1). No command line, friendly errors, a no-internet
+demo run, and a connection checker.
 
 ```bash
 cd gui && ./run.sh          # browser mode (run.bat on Windows)
-# or a native desktop window:
-python gui/desktop_app.py
+python gui/desktop_app.py   # or a native desktop window
 ```
 
-See [`gui/README.md`](gui/README.md). End-to-end test: `python gui/test_gui.py`.
+Ship it as a single double-click **`LeadEngine.exe`** (no Python needed): build on
+GitHub (Actions → **Build Windows EXE**, or push a `v*` tag for a Release) or locally
+via `gui\build.bat`. See [`gui/README.md`](gui/README.md) and
+[`gui/BUILD_EXE.md`](gui/BUILD_EXE.md). End-to-end test: `python gui/test_gui.py`.
 
-### Ship it as a Windows .exe — `gui/`
+---
 
-A single double-click `LeadEngine.exe`, no Python needed. Build it on GitHub
-(Actions → **Build Windows EXE**, or push a `v*` tag for a Release) or locally on
-Windows via `gui\build.bat`. Details: [`gui/BUILD_EXE.md`](gui/BUILD_EXE.md).
-
-**Add a new use case** = one file in `leadgen/verticals/` that calls
-`register(Vertical(...))` with a `score_fn` (and optional `enrich_fn`,
-`opener_fn`, `suppression_fn`). The `simply_tc` vertical shows the full pattern,
-including **competitor suppression** — scraping a rival's published client list to
-drop prospects who already use them. See `leadgen/verticals/simply_tc.py` and
-`simplytc/DESIGN.md` for the approach. Tests: `python leadgen/tests/test_engine.py`.
-
-## Legacy / companion tools
-
-### `scraper-gui/` — desktop app
-A clickable desktop app (Flask + pywebview, optionally compiled to a single .exe).
-Pick a city, pick niches, hit Scrape. It queries OpenStreetMap, audits each business's website
-(load time, HTTPS, mobile-friendly, what builder they use), scores the leads, and exports a ranked .xlsx.
-
-**Use when:** you want a quick interactive scrape and a clean spreadsheet to call from.
+## Supporting pieces
 
 ### `data-kit/` — bulk dataset + Claude-agent briefing
-A script that downloads a county-sized chunk of the [Overture Maps](https://overturemaps.org)
-Places dataset (Meta + Microsoft + Amazon's open business database). Plus a `CLAUDE_AGENT_BRIEFING.md`
-you hand to a Claude agent (Claude Code or otherwise) along with the data files.
+Downloads a county-sized chunk of the [Overture Maps](https://overturemaps.org)
+Places dataset, plus a `CLAUDE_AGENT_BRIEFING.md` you hand to a Claude agent along
+with the data files. **Use when:** you want to hand the whole project to a Claude
+agent for deeper enrichment, or work with the raw data programmatically.
 
-**Use when:** you want to hand the whole project off to a Claude agent for deeper enrichment,
-build a CRM pipeline, or work with the data programmatically.
-
-## Quick start
-
-### Just want the GUI scraper?
-```powershell
-cd scraper-gui
-python -m pip install -r requirements.txt
-python desktop_app.py
-```
-Or to make a standalone .exe: see `scraper-gui/BUILD_INSTRUCTIONS.md`.
-
-### Want the bulk dataset + agent project?
-```powershell
+```bash
 cd data-kit
 python -m pip install duckdb openpyxl
 python download_sonoma.py   # ~5 min, ~30 MB
-# then hand off to Claude Code:
-claude
-> Read CLAUDE_AGENT_BRIEFING.md and the three data files. Build me the lead-gen pipeline described.
 ```
+Different region? Edit the `BBOX` dict at the top of `data-kit/download_sonoma.py`
+(grab coordinates from https://bboxfinder.com).
 
-### Want a different region than Sonoma County?
-Edit the `BBOX` dict at the top of `data-kit/download_sonoma.py`. Get coordinates
-from https://bboxfinder.com (draw a box, copy the numbers).
+### `legacy/` — first-generation scrapers
+The original standalone `scraper.py` and `scraper-gui/` desktop app, **superseded** by
+the engine + GUI above. Kept for reference. See [`legacy/README.md`](legacy/README.md).
 
 ## Repo layout
 ```
 lead-scraper-toolkit/
-├── README.md                  ← you are here
-├── LICENSE                    ← MIT
-├── .gitignore
-├── scraper-gui/
-│   ├── app.py                 ← Flask backend (OSM scraper + audit + xlsx)
-│   ├── desktop_app.py         ← native-window entry point
-│   ├── requirements.txt
-│   ├── run.bat / run.sh       ← browser-mode launcher
-│   ├── build.bat / build.sh   ← compile standalone .exe
-│   ├── BUILD_INSTRUCTIONS.md
-│   └── README.md
-├── data-kit/
-│   ├── download_sonoma.py     ← Overture downloader
-│   ├── CLAUDE_AGENT_BRIEFING.md  ← hand this to a Claude agent
-│   └── README.md
-└── docs/
-    └── (room for future docs)
+├── README.md            ← you are here
+├── LICENSE              ← MIT
+├── leadgen/             ← Tool 1: universal scraping engine (verticals, CLI)
+├── lead-tracker/        ← Tool 2: local CRM (Next.js + SQLite)
+├── gui/                 ← LeadEngine desktop app / .exe — both tools, no setup
+├── data-kit/            ← Overture bulk downloader + Claude-agent briefing
+├── simplytc/            ← design notes for the simply_tc vertical
+└── legacy/              ← archived first-gen scrapers (scraper.py, scraper-gui/)
 ```
 
-## Tech notes
-- **Source: OpenStreetMap** for the GUI app (Overpass API, live queries).
-- **Source: Overture Maps** for the bulk data kit (Meta/MSFT/Amazon open dataset, monthly releases).
-- **Audit**: Python `requests` against each business's homepage. Checks status, HTTPS, mobile viewport, load time, builder fingerprint (Wix/Squarespace/Weebly/etc.).
-- **Output**: `.xlsx` with Tier A/B/C, score, pitch angle per lead.
-
 ## License
-MIT (see `LICENSE`). Overture data is CC-BY 4.0 — credit "Overture Maps Foundation" if you publish derived work.
+MIT (see `LICENSE`). Overture data is CC-BY 4.0 — credit "Overture Maps Foundation"
+if you publish derived work.
 
 ## Built with
-[Claude](https://claude.com) on a Saturday afternoon in May 2026.
+[Claude](https://claude.com).
