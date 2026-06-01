@@ -1,8 +1,35 @@
 # Lead Scraper Toolkit
 
-Two tools for finding local businesses that need a website — built for web-design lead generation.
+A **universal lead-generation engine**: one pipeline (collect → dedupe → enrich →
+suppress → score → export) driven by swappable **verticals**, where a vertical
+defines *what* you're prospecting for and *how* to score it. Ships with two
+verticals — transaction-coordinator leads (for [simplytc.com](https://simplytc.com))
+and the original web-design leads — plus the GUI and bulk-data tools below.
 
-## What's in this repo
+## The engine — `leadgen/`
+
+```bash
+pip install -r leadgen/requirements.txt
+
+python -m leadgen --list                     # show available verticals
+# Transaction-coordinator leads for SimplyTC:
+python -m leadgen --vertical simply_tc --market sonoma_county_ca --out sonoma_tc
+# Any geocodable place works as a market:
+python -m leadgen --vertical simply_tc --market "Austin, Texas" --sources overture osm
+# Original web-design use case, same engine:
+python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich
+```
+
+Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`.
+
+**Add a new use case** = one file in `leadgen/verticals/` that calls
+`register(Vertical(...))` with a `score_fn` (and optional `enrich_fn`,
+`opener_fn`, `suppression_fn`). The `simply_tc` vertical shows the full pattern,
+including **competitor suppression** — scraping a rival's published client list to
+drop prospects who already use them. See `leadgen/verticals/simply_tc.py` and
+`simplytc/DESIGN.md` for the approach. Tests: `python leadgen/tests/test_engine.py`.
+
+## Legacy / companion tools
 
 ### `scraper-gui/` — desktop app
 A clickable desktop app (Flask + pywebview, optionally compiled to a single .exe).
