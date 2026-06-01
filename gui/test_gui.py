@@ -83,6 +83,43 @@ def main():
     assert d.status_code == 200 and len(d.data) > 1000
     print(f"PASS XLSX download ({len(d.data)} bytes)")
 
+    # Demo mode — no network, no market required.
+    r = client.post("/run", json={"vertical": "simply_tc", "demo": True})
+    jid = r.get_json()["job_id"]
+    for _ in range(60):
+        p = client.get(f"/progress/{jid}").get_json()
+        if p["done"]:
+            break
+        time.sleep(0.2)
+    assert p["done"] and not p["error"], f"demo failed: {p.get('error')}"
+    assert p["stats"]["total"] == 5, p["stats"]
+    names = [l["name"] for l in p["leads"]]
+    assert names[0] == "Vanguard Properties", names
+    print("PASS demo mode:", p["stats"])
+
+    # Demo + CRM dedupe — remove a known company.
+    r = client.post("/run", json={"vertical": "simply_tc", "demo": True,
+                                   "crm_csv": "Company name\nHarbor Real Estate\n"})
+    jid = r.get_json()["job_id"]
+    for _ in range(60):
+        p = client.get(f"/progress/{jid}").get_json()
+        if p["done"]:
+            break
+        time.sleep(0.2)
+    got = [l["name"] for l in p["leads"]]
+    assert "Harbor Real Estate" not in got and p["stats"]["total"] == 4, (p["stats"], got)
+    print("PASS demo + CRM dedupe:", p["stats"])
+
+    # Missing market without demo → friendly validation error.
+    r = client.post("/run", json={"vertical": "simply_tc"})
+    assert r.status_code == 400 and "market" in r.get_json()["error"].lower()
+    print("PASS market-required validation")
+
+    # Connectivity check endpoint returns structured results.
+    c = client.get("/check").get_json()
+    assert "results" in c and "summary" in c and isinstance(c["results"], list)
+    print(f"PASS /check returns {len(c['results'])} probes")
+
     print("\nGUI END-TO-END OK")
 
 

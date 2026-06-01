@@ -26,6 +26,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import leadgen
 from leadgen import get_vertical, all_verticals, run_pipeline
 from leadgen.geo import MARKETS
+from leadgen.pipeline import load_crm_names
+from leadgen.diagnostics import check_connectivity, friendly_error, explain_empty_result
 
 app = Flask(__name__)
 
@@ -44,7 +46,8 @@ def run_job(job_id: str, params: dict):
 
     try:
         vertical = get_vertical(params["vertical"])
-        market = params["market"].strip()
+        demo = bool(params.get("demo"))
+        market = (params.get("market") or "").strip() or ("(demo)" if demo else "")
         sources = tuple(params.get("sources") or ["overture"])
         enrich = bool(params.get("enrich", True))
         limit = params.get("limit") or None
@@ -58,15 +61,21 @@ def run_job(job_id: str, params: dict):
             override[comp["config_key"]] = urls
             log(f"Using {len(urls)} competitor page(s) for suppression.")
 
+        # Existing-CRM dedupe: names pasted/uploaded so we never return a dupe.
+        exclude = load_crm_names(params.get("crm_csv", ""), is_text=True) if params.get("crm_csv") else None
+        if exclude:
+            log(f"Loaded {len(exclude)} company names from your CRM — will skip those.")
+
         stem = os.path.join(
             OUT_DIR,
-            f"{params['vertical']}_{_slug(market)}_{datetime.now():%Y%m%d_%H%M%S}")
+            f"{params['vertical']}_{_slug(market) or 'demo'}_{datetime.now():%Y%m%d_%H%M%S}")
 
-        log(f"Vertical: {vertical.label}")
+        log(f"Vertical: {vertical.label}" + ("  (DEMO MODE)" if demo else ""))
         leads = run_pipeline(
             vertical, market,
             sources=sources, limit=limit, enrich=enrich, enrich_cap=enrich_cap,
-            out_stem=stem, config_override=override or None, log=log,
+            out_stem=stem, config_override=override or None,
+            exclude_names=exclude, demo=demo, log=log,
         )
 
         files = run_pipeline.last_outputs  # (csv_path, xlsx_path) or None
@@ -78,9 +87,14 @@ def run_job(job_id: str, params: dict):
         # Keep a preview (top 50) for in-page rendering; full data is in the files.
         job["leads"] = leads[:50]
         job["stats"] = _tier_counts(leads, total=len(leads))
-        log(f"Done. {len(leads)} leads — download below.")
+        if not leads:
+            job["notice"] = explain_empty_result(market, sources, vertical.label)
+            log(job["notice"])
+        else:
+            log(f"Done. {len(leads)} leads — download below.")
     except Exception as e:
-        job["error"] = f"{type(e).__name__}: {e}"
+        raw = f"{type(e).__name__}: {e}"
+        job["error"] = friendly_error(str(e)) or raw
         log(f"ERROR: {job['error']}")
     finally:
         job["done"] = True
@@ -112,13 +126,21 @@ def index():
 @app.route("/run", methods=["POST"])
 def start_run():
     params = request.get_json(force=True)
-    if not params.get("vertical") or not params.get("market"):
-        return jsonify({"error": "vertical and market are required"}), 400
+    if not params.get("vertical"):
+        return jsonify({"error": "vertical is required"}), 400
+    if not params.get("demo") and not params.get("market"):
+        return jsonify({"error": "market is required (or use Demo mode)"}), 400
     jid = str(int(time.time() * 1000))
-    JOBS[jid] = {"log": [], "done": False, "error": None,
+    JOBS[jid] = {"log": [], "done": False, "error": None, "notice": None,
                  "stats": None, "leads": None, "files": None, "columns": None}
     threading.Thread(target=run_job, args=(jid, params), daemon=True).start()
     return jsonify({"job_id": jid})
+
+
+@app.route("/check")
+def check():
+    """Connectivity self-check — probe every data source, plain-English status."""
+    return jsonify(check_connectivity())
 
 
 @app.route("/progress/<jid>")
@@ -128,6 +150,7 @@ def progress(jid):
         return jsonify({"error": "unknown job"}), 404
     return jsonify({
         "log": job["log"], "done": job["done"], "error": job["error"],
+        "notice": job.get("notice"),
         "stats": job["stats"], "files": job["files"],
         "leads": job["leads"] if job["done"] and not job["error"] else None,
         "columns": job["columns"],
@@ -180,6 +203,18 @@ textarea{resize:vertical;min-height:74px}
 button{background:var(--blue);color:#fff;border:none;padding:11px 22px;border-radius:8px;
   font-size:15px;font-weight:600;cursor:pointer}button:hover{background:#163a5a}
 button:disabled{background:#a9b2bd;cursor:not-allowed}
+button.ghost{background:#fff;color:var(--blue);border:1.5px solid #c4ccd6}
+button.ghost:hover{background:#eef2f7}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px}
+input[type=file]{font-size:13px}
+#checkout{margin-top:12px}
+.probe{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0}
+.probe .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.dot.ok{background:#28a745}.dot.bad{background:#d6453f}
+.banner{border-radius:9px;padding:11px 14px;margin-top:10px;font-size:13.5px}
+.banner.good{background:#e8f8ec;border:1px solid #b6e3c2}
+.banner.warn{background:#fff4e0;border:1px solid #f0d49a}
+.banner.bad{background:#fdecee;border:1px solid #f0bcc0}
 .vdesc{font-size:12.5px;color:#566;margin-top:6px;line-height:1.45}
 #status{display:none;margin-top:8px;background:#0d1b2a;color:#c8e1ff;border-radius:9px;
   padding:12px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
@@ -236,6 +271,13 @@ th{background:#eef2f7;position:sticky;top:0}
   </fieldset>
 
   <fieldset>
+    <legend>4 · Skip people already in your CRM <span style="font-weight:400;color:#889">(optional)</span></legend>
+    <label class="fld">Upload your current CRM export (.csv)</label>
+    <input type="file" id="crm_file" accept=".csv,text/csv">
+    <div class="hint" id="crm_status">We match on company name and remove anyone you already have — so you never get a duplicate.</div>
+  </fieldset>
+
+  <fieldset>
     <legend>Options</legend>
     <div class="row">
       <div>
@@ -253,8 +295,12 @@ th{background:#eef2f7;position:sticky;top:0}
     </div>
   </fieldset>
 
-  <button type="submit" id="go">Run</button>
-  <span class="hint" id="netnote"></span>
+  <div class="btnrow">
+    <button type="submit" id="go">Run</button>
+    <button type="button" id="demo" class="ghost">▶ Try a demo (no internet needed)</button>
+    <button type="button" id="check" class="ghost">📡 Check my connection</button>
+  </div>
+  <div id="checkout"></div>
 </form>
 
 <div id="summary" class="row">
@@ -287,29 +333,70 @@ function syncVertical(){
 vsel.addEventListener("change", syncVertical); syncVertical();
 
 const form=document.getElementById("form"), go=document.getElementById("go");
+const demoBtn=document.getElementById("demo"), checkBtn=document.getElementById("check");
+const checkout=document.getElementById("checkout");
 const statusEl=document.getElementById("status"), summary=document.getElementById("summary");
 const dls=document.getElementById("dls"), tablewrap=document.getElementById("tablewrap"), table=document.getElementById("preview");
 
-form.addEventListener("submit", async e=>{
-  e.preventDefault();
+// Read an uploaded CRM .csv into memory (text) so the server can dedupe against it.
+let crmText="";
+document.getElementById("crm_file").addEventListener("change", e=>{
+  const f=e.target.files[0]; const st=document.getElementById("crm_status");
+  if(!f){ crmText=""; return; }
+  const reader=new FileReader();
+  reader.onload=()=>{ crmText=reader.result||"";
+    const lines=crmText.split(/\\r?\\n/).filter(x=>x.trim()).length-1;
+    st.textContent=`Loaded ${f.name} — about ${Math.max(0,lines)} companies will be skipped if found.`; };
+  reader.readAsText(f);
+});
+
+function baseBody(){
   const sources=[]; if(document.getElementById("src_overture").checked) sources.push("overture");
   if(document.getElementById("src_osm").checked) sources.push("osm");
-  if(!document.getElementById("market").value.trim()){ alert("Enter a market."); return; }
-  if(!sources.length){ alert("Pick at least one data source."); return; }
-  const body={
+  return {
     vertical:vsel.value, market:document.getElementById("market").value,
     sources, enrich:document.getElementById("enrich").checked,
     enrich_cap:+document.getElementById("enrich_cap").value||0,
     limit:+document.getElementById("limit").value||0,
     competitor_urls:document.getElementById("competitor_urls").value,
+    crm_csv:crmText,
   };
-  go.disabled=true; go.textContent="Running…";
-  statusEl.style.display="block"; statusEl.textContent="Starting…";
+}
+
+async function startRun(body){
+  go.disabled=true; demoBtn.disabled=true; go.textContent="Running…";
+  statusEl.style.display="block"; statusEl.textContent="Starting…"; checkout.innerHTML="";
   summary.style.display="none"; dls.style.display="none"; tablewrap.style.display="none"; table.style.display="none";
   const r=await fetch("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const j=await r.json();
-  if(j.error){ statusEl.textContent="Error: "+j.error; go.disabled=false; go.textContent="Run"; return; }
+  if(j.error){ statusEl.textContent="Couldn't start: "+j.error; go.disabled=false; demoBtn.disabled=false; go.textContent="Run"; return; }
   poll(j.job_id);
+}
+
+form.addEventListener("submit", e=>{
+  e.preventDefault();
+  const body=baseBody();
+  if(!body.market.trim()){ alert("Enter a market, or click 'Try a demo'."); return; }
+  if(!body.sources.length){ alert("Pick at least one data source."); return; }
+  body.demo=false; startRun(body);
+});
+
+demoBtn.addEventListener("click", ()=>{
+  const body=baseBody(); body.demo=true; body.market=body.market||"(demo)";
+  startRun(body);
+});
+
+checkBtn.addEventListener("click", async ()=>{
+  checkBtn.disabled=true; checkout.innerHTML="<div class='hint'>Testing each data source…</div>";
+  try{
+    const j=await (await fetch("/check")).json();
+    let h=j.results.map(p=>`<div class="probe"><span class="dot ${p.ok?'ok':'bad'}"></span>`
+      +`<b>${p.label}</b> — ${p.detail}</div>`).join("");
+    const cls=(j.can_overture||j.can_osm)?(j.can_overture&&j.can_osm?"good":"warn"):"bad";
+    h+=`<div class="banner ${cls}">${j.summary}</div>`;
+    checkout.innerHTML=h;
+  }catch(e){ checkout.innerHTML="<div class='banner bad'>Could not run the check.</div>"; }
+  checkBtn.disabled=false;
 });
 
 function poll(jid){
@@ -317,7 +404,9 @@ function poll(jid){
     const r=await fetch("/progress/"+jid); const j=await r.json();
     statusEl.textContent=j.log.join("\\n"); statusEl.scrollTop=statusEl.scrollHeight;
     if(j.done){
-      clearInterval(t); go.disabled=false; go.textContent="Run";
+      clearInterval(t); go.disabled=false; demoBtn.disabled=false; go.textContent="Run";
+      if(j.error){ checkout.innerHTML=`<div class="banner bad">${j.error}</div>`; }
+      if(j.notice){ checkout.innerHTML=`<div class="banner warn">${j.notice}</div>`; }
       if(j.stats){
         summary.style.display="flex";
         s_total.textContent=j.stats.total; s_A.textContent=j.stats.A;

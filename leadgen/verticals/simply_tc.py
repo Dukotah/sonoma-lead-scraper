@@ -115,8 +115,13 @@ def _enrich(rec: dict, ctx: dict) -> dict:
         rec["agent_count"] = 0
         rec["enrich_note"] = "no website to inspect"
         return rec
-    pages = fetch_pages(website, config["roster_paths"])
-    if not pages:
+    # Demo mode: enrich from bundled fixture HTML instead of fetching the network.
+    demo_html = ctx.get("demo_html")
+    if demo_html is not None:
+        pages = {website: demo_html(website)}
+    else:
+        pages = fetch_pages(website, config["roster_paths"])
+    if not pages or not any(pages.values()):
         rec["tc_gap"] = "unknown"
         rec["agent_count"] = 0
         rec["enrich_note"] = "site unreachable"
