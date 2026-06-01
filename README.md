@@ -1,8 +1,61 @@
 # Lead Scraper Toolkit
 
-Two tools for finding local businesses that need a website — built for web-design lead generation.
+A **universal lead-generation engine**: one pipeline (collect → dedupe → enrich →
+suppress → score → export) driven by swappable **verticals**, where a vertical
+defines *what* you're prospecting for and *how* to score it. Ships with two
+verticals — transaction-coordinator leads (for [simplytc.com](https://simplytc.com))
+and the original web-design leads — plus the GUI and bulk-data tools below.
 
-## What's in this repo
+## The engine — `leadgen/`
+
+```bash
+pip install -r leadgen/requirements.txt
+
+python -m leadgen --list                     # show available verticals
+# Transaction-coordinator leads for SimplyTC:
+python -m leadgen --vertical simply_tc --market sonoma_county_ca --out sonoma_tc
+# Any geocodable place works as a market:
+python -m leadgen --vertical simply_tc --market "Austin, Texas" --sources overture osm
+# Original web-design use case, same engine:
+python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich
+```
+
+Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`.
+
+### Point-and-click GUI — `gui/`
+
+No command line needed: pick a vertical + market, paste competitor pages to skip,
+upload your CRM to de-dupe, hit Run, watch live progress, download the CSV/XLSX.
+Built for a non-technical user:
+
+- **Try a demo** — a full sample run with **no internet**, so you see real output first.
+- **Check my connection** — tests each data source and says, in plain English,
+  what works before you waste a run.
+- **Skip people already in your CRM** — upload a CSV; matches are removed, never duplicated.
+- **Friendly errors** — guidance instead of tracebacks.
+
+```bash
+cd gui && ./run.sh          # browser mode (run.bat on Windows)
+# or a native desktop window:
+python gui/desktop_app.py
+```
+
+See [`gui/README.md`](gui/README.md). End-to-end test: `python gui/test_gui.py`.
+
+### Ship it as a Windows .exe — `gui/`
+
+A single double-click `LeadEngine.exe`, no Python needed. Build it on GitHub
+(Actions → **Build Windows EXE**, or push a `v*` tag for a Release) or locally on
+Windows via `gui\build.bat`. Details: [`gui/BUILD_EXE.md`](gui/BUILD_EXE.md).
+
+**Add a new use case** = one file in `leadgen/verticals/` that calls
+`register(Vertical(...))` with a `score_fn` (and optional `enrich_fn`,
+`opener_fn`, `suppression_fn`). The `simply_tc` vertical shows the full pattern,
+including **competitor suppression** — scraping a rival's published client list to
+drop prospects who already use them. See `leadgen/verticals/simply_tc.py` and
+`simplytc/DESIGN.md` for the approach. Tests: `python leadgen/tests/test_engine.py`.
+
+## Legacy / companion tools
 
 ### `scraper-gui/` — desktop app
 A clickable desktop app (Flask + pywebview, optionally compiled to a single .exe).

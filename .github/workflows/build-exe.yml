@@ -1,0 +1,69 @@
+name: Build Windows EXE
+
+# Builds a self-contained LeadEngine.exe on a real Windows runner.
+# Triggers:
+#   - manually (Actions tab → Run workflow)
+#   - on any tag like v1.0.0  (also attaches the exe to a GitHub Release)
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create/attach a Release on tag builds
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r gui/requirements.txt
+          pip install pyinstaller
+
+      - name: Sanity-check the engine before packaging
+        run: |
+          python leadgen/tests/test_engine.py
+          python leadgen/tests/test_heuristics.py
+          python leadgen/tests/test_features.py
+
+      - name: Build the EXE
+        run: pyinstaller --clean --noconfirm gui/LeadEngine.spec
+
+      - name: Smoke-test the built EXE boots and serves
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "dist/LeadEngine.exe" -PassThru
+          Start-Sleep -Seconds 15
+          $ok = $false
+          foreach ($p in 5000,5001,5050,8000,8080,8765) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:$p/" -TimeoutSec 3 -UseBasicParsing
+              if ($r.StatusCode -eq 200) { Write-Host "Served on port $p"; $ok = $true; break }
+            } catch {}
+          }
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Error "EXE did not serve the UI"; exit 1 }
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeadEngine-windows
+          path: dist/LeadEngine.exe
+          if-no-files-found: error
+
+      - name: Attach EXE to the Release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/LeadEngine.exe
