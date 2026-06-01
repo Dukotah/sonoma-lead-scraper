@@ -110,6 +110,13 @@ function buildFilter(p) {
   else if (p.audit === "good") where.push("a.audit_grade = 'good'");
   else if (p.audit === "yes") where.push("a.audit_grade IS NOT NULL");
   else if (p.audit === "no") where.push("a.audit_grade IS NULL");
+  // Today's-call-list filter: the warmest *callable* leads in one shot —
+  // reachable by phone AND with a provable website need (no/weak site = Tier A,
+  // DIY builder = Tier B, or a live audit that came back weak/broken).
+  if (p.callList === "1" || p.callList === true) {
+    where.push("l.phone IS NOT NULL AND l.phone <> ''");
+    where.push("(l.tier IN ('A','B') OR a.audit_grade IN ('weak','broken'))");
+  }
 
   return { where: where.length ? `WHERE ${where.join(" AND ")}` : "", params };
 }
