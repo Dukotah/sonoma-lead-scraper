@@ -25,7 +25,14 @@ Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`.
 ### Point-and-click GUI — `gui/`
 
 No command line needed: pick a vertical + market, paste competitor pages to skip,
-hit Run, watch live progress, download the CSV/XLSX.
+upload your CRM to de-dupe, hit Run, watch live progress, download the CSV/XLSX.
+Built for a non-technical user:
+
+- **Try a demo** — a full sample run with **no internet**, so you see real output first.
+- **Check my connection** — tests each data source and says, in plain English,
+  what works before you waste a run.
+- **Skip people already in your CRM** — upload a CSV; matches are removed, never duplicated.
+- **Friendly errors** — guidance instead of tracebacks.
 
 ```bash
 cd gui && ./run.sh          # browser mode (run.bat on Windows)
@@ -34,6 +41,12 @@ python gui/desktop_app.py
 ```
 
 See [`gui/README.md`](gui/README.md). End-to-end test: `python gui/test_gui.py`.
+
+### Ship it as a Windows .exe — `gui/`
+
+A single double-click `LeadEngine.exe`, no Python needed. Build it on GitHub
+(Actions → **Build Windows EXE**, or push a `v*` tag for a Release) or locally on
+Windows via `gui\build.bat`. Details: [`gui/BUILD_EXE.md`](gui/BUILD_EXE.md).
 
 **Add a new use case** = one file in `leadgen/verticals/` that calls
 `register(Vertical(...))` with a `score_fn` (and optional `enrich_fn`,
