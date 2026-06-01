@@ -115,7 +115,10 @@ export default function LeadTracker() {
   return (
     <div className="lt">
       <header className="lt-head">
-        <h1>Lead Tracker</h1>
+        <div className="lt-titlebar">
+          <h1>Lead Tracker</h1>
+          <a className="lt-today-link" href="/today">📞 Today&apos;s Call List →</a>
+        </div>
         {stats && (
           <div className="lt-stats">
             <Stat label="Leads" value={stats.total} />

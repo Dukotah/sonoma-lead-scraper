@@ -19,6 +19,68 @@ a { color: var(--brand); }
 
 .lt { max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px; }
 .lt-head h1 { margin: 0 0 12px; font-size: 22px; }
+.lt-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lt-titlebar h1 { margin: 0 0 12px; }
+.lt-today-link {
+  display: inline-block; padding: 8px 14px; border-radius: 8px; font-weight: 700;
+  text-decoration: none; color: #fff; background: var(--brand); white-space: nowrap;
+}
+.lt-today-link:hover { background: #163a5c; }
+
+/* ---- Today's Call List ---- */
+.cl { max-width: 880px; margin: 0 auto; padding: 20px 20px 80px; }
+.cl-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cl-title h1 { margin: 0; font-size: 24px; }
+.cl-link { font-weight: 600; text-decoration: none; }
+.cl-sub { color: var(--muted); margin: 6px 0 14px; }
+.cl-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.cl-controls select, .cl-target input {
+  padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; font: inherit; background: var(--card);
+}
+.cl-target input { width: 64px; margin-left: 2px; }
+.cl-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.cl-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.cl-bar { flex: 1; height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.cl-bar span { display: block; height: 100%; background: var(--hot); transition: width .25s; }
+.cl-count { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.cl-count b { color: var(--ink); font-size: 16px; }
+.cl-empty { text-align: center; color: var(--muted); padding: 48px 0; font-size: 16px; }
+
+.cl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.cl-card {
+  display: flex; gap: 14px; background: var(--card); border: 1px solid var(--line);
+  border-left: 4px solid var(--brand); border-radius: 12px; padding: 14px 16px;
+}
+.cl-card.done { opacity: .5; border-left-color: var(--hot); }
+.cl-rank { font-size: 18px; font-weight: 700; color: var(--muted); min-width: 26px; }
+.cl-body { flex: 1; min-width: 0; }
+.cl-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cl-name { font-size: 17px; font-weight: 700; }
+.cl-prob { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.cl-prob.p-none { background: var(--hot-bg); color: #0f6b3a; }
+.cl-prob.p-broken { background: #f3d6d6; color: #a12626; }
+.cl-prob.p-weak { background: #fff4d6; color: #9a6700; }
+.cl-prob.p-diy { background: #e0ecff; color: #1c4e8a; }
+.cl-score { font-size: 12px; color: var(--muted); margin-left: auto; }
+.cl-doneflag { font-size: 12px; color: var(--hot); font-weight: 600; }
+.cl-meta { color: var(--muted); font-size: 13px; margin: 4px 0 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+.cl-addr { opacity: .8; }
+.cl-pitch { background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.cl-pitch p { margin: 0 0 6px; }
+.cl-copy { font: inherit; font-size: 12px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
+.cl-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cl-call {
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px;
+  background: var(--hot); color: #fff; font-weight: 700; text-decoration: none; font-size: 15px;
+}
+.cl-call:hover { background: #0f6b3a; }
+.cl-outcomes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.oc { font: inherit; font-size: 13px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); cursor: pointer; }
+.oc:hover { border-color: var(--brand); }
+.oc-win:hover { border-color: var(--hot); background: var(--hot-bg); }
+.oc-no:hover { border-color: #a12626; background: #f3d6d6; }
+.cl-noterow { margin-top: 10px; }
+.cl-note { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
 
 .lt-stats { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
 .lt-stat {
