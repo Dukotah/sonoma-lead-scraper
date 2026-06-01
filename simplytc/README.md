@@ -1,5 +1,12 @@
 # SimplyTC Lead Engine
 
+> **Implementation status:** this folder is the **design & approach**. The working
+> implementation now lives in the universal engine at `../leadgen/`, as the
+> `simply_tc` vertical (`../leadgen/verticals/simply_tc.py`). Run it with
+> `python -m leadgen --vertical simply_tc --market <market> --out <stem>`.
+> This `DESIGN.md` remains the canonical explanation of *why* it works the way it does.
+
+
 Finds **real-estate brokerages & high-volume agents** who likely need a
 transaction coordinator and **aren't already locked in with a competitor** —
 enriched, scored, and CRM-ready for [simplytc.com](https://simplytc.com).
