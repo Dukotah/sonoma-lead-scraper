@@ -1,5 +1,9 @@
 # Lead Scraper Toolkit
 
+> **Picking this up fresh (human or AI agent)?** Read [`START_HERE.md`](START_HERE.md)
+> first — it's the operational handoff: current state, how to run/ship each piece, and
+> the one sandbox gotcha (live scraping needs internet → runs on GitHub Actions).
+
 Two tools, one job: **fill a pipeline with web-design (and other) leads, then work
 them until they're customers.** Everything runs on your own machine off free public
 data — no accounts, no API keys.

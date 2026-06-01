@@ -1,0 +1,7 @@
+# leadgen engine dependencies
+# Core: collect + website audit
+requests>=2.31
+# Excel (.xlsx) export
+openpyxl>=3.1
+# Optional: only needed for the Overture (bulk) data source
+duckdb>=0.9
