@@ -1,0 +1,90 @@
+name: Deep Audit (one-time)
+
+# One-time, exhaustive website enrichment. Unlike the weekly Website Audit, this
+# runs the deep pass (Tier-A web discovery + retries/DNS + contact-page crawl for
+# emails/owners + neglected-site signals + 0-100 quality score) with runtime as a
+# non-constraint. Results are committed per county so a runner that hits the 6-hour
+# cap still banks finished counties; just re-run (Actions tab -> Run workflow) and
+# it resumes via the skip-already-done logic. Counties run small -> large so the
+# quick wins land first.
+#
+# Auto-starts when audit_deep.py or this workflow is pushed; the bot's results
+# commit only touches data/export/audit/** (not these paths) so it cannot re-trigger.
+
+on:
+  workflow_dispatch:
+    inputs:
+      county:
+        description: "Which county (or 'all')"
+        type: choice
+        default: all
+        options: [all, lake, mendocino, napa, marin, solano, sonoma]
+      tiers:
+        description: "Tiers to enrich"
+        default: "A,B,C"
+      discover:
+        description: "Run Tier-A web discovery (slow; DuckDuckGo)"
+        type: boolean
+        default: true
+  push:
+    branches: [claude/lead-scraping-tool-status-16Wd9]
+    paths:
+      - "lead-tracker/scripts/audit_deep.py"
+      - ".github/workflows/deep-audit.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deep-audit
+  cancel-in-progress: false
+
+jobs:
+  deep-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --quiet requests
+
+      - name: Run deep audit (commit per county)
+        env:
+          COUNTY: ${{ github.event.inputs.county || 'all' }}
+          TIERS: ${{ github.event.inputs.tiers || 'A,B,C' }}
+          DISCOVER: ${{ github.event.inputs.discover }}
+        run: |
+          set -e
+          cd lead-tracker
+          mkdir -p data/export/audit
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ "$COUNTY" = "all" ] || [ -z "$COUNTY" ]; then
+            COUNTIES="lake mendocino napa marin solano sonoma"
+          else
+            COUNTIES="$COUNTY"
+          fi
+          DISC_FLAG=""
+          if [ "$DISCOVER" = "false" ]; then DISC_FLAG="--no-discover"; fi
+          for c in $COUNTIES; do
+            IN="data/export/$c/${c}_leads_full.csv"
+            OUT="data/export/audit/${c}_deep.csv"
+            if [ ! -f "$IN" ]; then echo "skip $c (no $IN)"; continue; fi
+            echo "::group::deep audit $c"
+            python scripts/audit_deep.py --in "$IN" --out "$OUT" \
+              --tiers "$TIERS" --workers 8 --discover-workers 2 --limit 0 $DISC_FLAG
+            echo "::endgroup::"
+            # Bank this county before moving on (survives a later timeout).
+            git add "$OUT" || true
+            if ! git diff --cached --quiet; then
+              git commit -m "ci: deep audit $c [skip ci]"
+              git push || (sleep 5 && git push)
+            else
+              echo "No changes for $c."
+            fi
+          done
