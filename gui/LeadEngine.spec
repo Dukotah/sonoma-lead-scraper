@@ -40,6 +40,16 @@ hiddenimports += _safe_submodules("webview")
 # already pulled in via collect_submodules above — no separate data files needed.
 datas = []
 
+# Bundle every collected lead dataset into the exe so the app ships as a complete,
+# offline, searchable lead database (gui/app.py reads these from _MEIPASS/leads_data).
+_EXPORT = os.path.join(REPO, "lead-tracker", "data", "export")
+for _county in ("sonoma", "napa", "marin", "mendocino", "lake", "solano"):
+    _csv_path = os.path.join(_EXPORT, _county, f"{_county}_leads_full.csv")
+    if os.path.exists(_csv_path):
+        datas.append((_csv_path, os.path.join("leads_data", _county)))
+    else:
+        print(f"[spec] WARNING: dataset missing, not bundled: {_csv_path}")
+
 block_cipher = None
 
 a = Analysis(

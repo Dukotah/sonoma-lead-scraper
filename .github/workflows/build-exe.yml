@@ -2,10 +2,16 @@ name: Build Windows EXE
 
 # Builds a self-contained LeadEngine.exe on a real Windows runner.
 # Triggers:
-#   - manually (Actions tab → Run workflow)
+#   - manually (Actions tab → Run workflow). Set "release_tag" to also publish a
+#     public Release with the exe attached (the runner's GITHUB_TOKEN creates the
+#     tag + release, so no local tag-push is needed).
 #   - on any tag like v1.0.0  (also attaches the exe to a GitHub Release)
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a public Release at this tag (e.g. v1.0.0). Leave blank for an artifact-only build."
+        default: ""
   push:
     tags:
       - "v*"
@@ -62,8 +68,11 @@ jobs:
           path: dist/LeadEngine.exe
           if-no-files-found: error
 
-      - name: Attach EXE to the Release (tag builds only)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish Release with the EXE (tag push, or dispatch with release_tag)
+        if: ${{ startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' }}
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag || '' }}
+          name: ${{ github.event.inputs.release_tag || '' }}
           files: dist/LeadEngine.exe
+          fail_on_unmatched_files: true
