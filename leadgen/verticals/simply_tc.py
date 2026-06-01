@@ -22,10 +22,27 @@ from ..suppression import build_suppression_set
 # ─────────────────────────────── CONFIG ──────────────────────────────────────
 CONFIG = {
     # Rival TC companies whose published client/testimonial pages we scrape to find
-    # brokerages that ALREADY have a TC. ⚠️ PLACEHOLDERS — add the real ones.
+    # brokerages that ALREADY have a TC. Seeded from web research (June 2026) —
+    # VERIFY each URL resolves and review the scraped names before relying on them.
+    # Put your mom's known local rivals at the top; "Real Estate Paper Pushers"
+    # is the most direct competitor (it operates in Sonoma County too).
     "competitor_tc_seeds": {
-        # "transactly":        "https://transactly.com/testimonials",
-        # "my_tc_company":     "https://example-tc.com/our-clients",
+        # — Direct / regional (California & Sonoma County) —
+        "real_estate_paper_pushers": "https://realestatepaperpushers.com/",
+        "real_estate_paper_pushers_sonoma": "https://realestatepaperpushers.com/California/Sonoma-County",
+        "california_tc": "https://www.californiatc.net/",
+        # — National players (publish agent/brokerage testimonials) —
+        "coordinator_team": "https://coordinatorteam.com/",
+        "premier_tc_services": "https://www.premiertcsvc.com/",
+        "transactly": "https://transactly.com/",
+        "xact_tc": "https://www.xact-tc.com/",
+        "be_happy_tc": "https://www.behappytc.com/",
+        "agentup": "https://www.agentup.com/",
+        "myoutdesk": "https://www.myoutdesk.com/services/transaction-coordinator/",
+        "freedom_res": "https://www.freedom-res.com/transaction-coordinator-for-brokers/",
+        "tctor": "https://tctor.com/",
+        "taylor_tc": "https://www.taylortcexpert.com/",
+        # Add more rivals you know of — one "label": "URL" per line.
     },
 
     # TM SOFTWARE fingerprints (uses tooling — may still lack a human TC → pitchable).
