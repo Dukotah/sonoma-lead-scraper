@@ -11,6 +11,7 @@ env/
 build/
 dist/
 *.spec
+!gui/LeadEngine.spec   # this one is source (our build recipe), keep it
 
 # GUI run outputs (generated lead files)
 gui/_output/*
