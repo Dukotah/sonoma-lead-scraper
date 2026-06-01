@@ -102,6 +102,14 @@ function buildFilter(p) {
   }
   if (p.favorite === "1" || p.favorite === true)
     where.push("COALESCE(c.favorite, 0) = 1");
+  // Live-audit grade filter. "bad" = the money filter: a real site that's
+  // weak or broken — a provable upsell. Also expose each grade + audited/not.
+  if (p.audit === "bad") where.push("a.audit_grade IN ('weak','broken')");
+  else if (p.audit === "broken") where.push("a.audit_grade = 'broken'");
+  else if (p.audit === "weak") where.push("a.audit_grade = 'weak'");
+  else if (p.audit === "good") where.push("a.audit_grade = 'good'");
+  else if (p.audit === "yes") where.push("a.audit_grade IS NOT NULL");
+  else if (p.audit === "no") where.push("a.audit_grade IS NULL");
 
   return { where: where.length ? `WHERE ${where.join(" AND ")}` : "", params };
 }
@@ -204,6 +212,9 @@ export function getStats() {
     .get().n;
   const avgScore = db.prepare("SELECT ROUND(AVG(score),1) v FROM leads").get().v;
   const audited = db.prepare("SELECT COUNT(*) n FROM audit").get().n;
+  const badSites = db
+    .prepare("SELECT COUNT(*) n FROM audit WHERE audit_grade IN ('weak','broken')")
+    .get().n;
   const byStatus = db
     .prepare(
       `SELECT COALESCE(c.status, 'New') status, COUNT(*) n
@@ -215,7 +226,7 @@ export function getStats() {
   const status = {};
   for (const s of STATUSES) status[s] = 0;
   for (const r of byStatus) status[r.status] = r.n;
-  return { total, tierA, tierB, tierC, withPhone, avgScore, audited, favorites, status };
+  return { total, tierA, tierB, tierC, withPhone, avgScore, audited, badSites, favorites, status };
 }
 
 // Partial update of a lead's CRM state. Only provided keys change; pass notes:""

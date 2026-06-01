@@ -38,7 +38,7 @@ function useDebounced(value, ms) {
 export default function LeadTracker() {
   const [filters, setFilters] = useState({
     q: "", city: "", category: "", tier: "", status: "",
-    hasWebsite: "", hasPhone: "", favorite: "", builder: "", minScore: "",
+    hasWebsite: "", hasPhone: "", favorite: "", builder: "", minScore: "", audit: "",
   });
   const [sort, setSort] = useState({ sort: "tier", order: "asc" });
   const [page, setPage] = useState(1);
@@ -108,7 +108,7 @@ export default function LeadTracker() {
 
   const clearFilters = () =>
     setFilters({ q: "", city: "", category: "", tier: "", status: "",
-      hasWebsite: "", hasPhone: "", favorite: "", builder: "", minScore: "" });
+      hasWebsite: "", hasPhone: "", favorite: "", builder: "", minScore: "", audit: "" });
 
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
@@ -122,6 +122,16 @@ export default function LeadTracker() {
             <Stat label="Tier A (hot)" value={stats.tierA} accent />
             <Stat label="Tier B (DIY)" value={stats.tierB} />
             <Stat label="With phone" value={stats.withPhone} />
+            {stats.badSites > 0 && (
+              <button
+                className={`lt-stat as-button ${filters.audit === "bad" ? "accent" : ""}`}
+                onClick={() => setF("audit", filters.audit === "bad" ? "" : "bad")}
+                title="Audited sites graded weak or broken — provable upsells"
+              >
+                <span className="lt-stat-n">{(stats.badSites ?? 0).toLocaleString()}</span>
+                <span className="lt-stat-l">🔥 Bad sites</span>
+              </button>
+            )}
             <Stat label="Avg score" value={stats.avgScore} />
             <Stat label="★ Favorites" value={stats.favorites} />
             <span className="lt-pipe">
@@ -181,6 +191,16 @@ export default function LeadTracker() {
           <option value="">Website: any</option>
           <option value="no">No website</option>
           <option value="yes">Has website</option>
+        </select>
+        <select value={filters.audit} onChange={(e) => setF("audit", e.target.value)}
+          title="Live website-audit results">
+          <option value="">Audit: any</option>
+          <option value="bad">🔥 Bad website (weak/broken)</option>
+          <option value="broken">Broken</option>
+          <option value="weak">Weak</option>
+          <option value="good">Good</option>
+          <option value="yes">Audited</option>
+          <option value="no">Not yet audited</option>
         </select>
         <label className="lt-toggle">
           <input type="checkbox" checked={filters.hasPhone === "yes"}

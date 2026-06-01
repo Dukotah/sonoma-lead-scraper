@@ -26,6 +26,8 @@ a { color: var(--brand); }
   padding: 8px 14px; min-width: 92px; display: flex; flex-direction: column;
 }
 .lt-stat.accent { border-color: var(--hot); background: var(--hot-bg); }
+.lt-stat.as-button { cursor: pointer; align-items: flex-start; text-align: left; font: inherit; }
+.lt-stat.as-button:hover { border-color: var(--hot); }
 .lt-stat-n { font-size: 20px; font-weight: 700; }
 .lt-stat-l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
 .lt-pipe { display: flex; gap: 6px; align-items: center; margin-left: 4px; }
