@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import leadgen
 from leadgen import get_vertical
 from leadgen.suppression import norm, _candidates_from_html, build_suppression_set
-from leadgen.verticals.simply_tc import _fingerprint_tc, CONFIG
+from leadgen.verticals.simply_tc import fingerprint_tc, CONFIG
 from leadgen.export import write_csv
 from leadgen.pipeline import _dedupe
 
@@ -29,15 +29,17 @@ def test_norm_strips_legal_suffixes():
 
 
 def test_tc_fingerprint_priority():
+    # fingerprint_tc now takes a {url: html} pages dict
+    def pages(h):
+        return {"http://x/": h}
     # in-house phrase beats software fingerprint
-    html = "We have an in-house transaction coordinator. Powered by SkySlope."
-    fp = _fingerprint_tc(html, CONFIG)
+    fp = fingerprint_tc(pages("We have an in-house transaction coordinator. Powered by SkySlope."), CONFIG)
     assert fp["tc_gap"] == "in_house"
     # software only
-    fp = _fingerprint_tc("Listings managed in Dotloop.", CONFIG)
+    fp = fingerprint_tc(pages("Listings managed in Dotloop."), CONFIG)
     assert fp["tc_gap"] == "software" and fp["tc_software"] == "Dotloop"
     # nothing → open (the good leads)
-    fp = _fingerprint_tc("Welcome to our brokerage. Buy and sell homes.", CONFIG)
+    fp = fingerprint_tc(pages("Welcome to our brokerage. Buy and sell homes."), CONFIG)
     assert fp["tc_gap"] == "open"
 
 

@@ -16,7 +16,7 @@ COMPETITOR_TC_SEEDS with the real rival TC firms in your mom's markets.
 from __future__ import annotations
 
 from .. import register, Vertical
-from ..enrich import fetch_pages, count_matches, find_decision_maker
+from ..enrich import fetch_pages, estimate_roster, find_decision_maker, find_phrases
 from ..suppression import build_suppression_set
 
 # ─────────────────────────────── CONFIG ──────────────────────────────────────
@@ -33,25 +33,39 @@ CONFIG = {
         "skyslope": "SkySlope", "dotloop": "Dotloop",
         "paperlesspipeline": "Paperless Pipeline", "brokermint": "Brokermint",
         "transactiondesk": "TransactionDesk", "transactly": "Transactly",
-        "open to close": "Open To Close",
+        "open to close": "Open To Close", "brokerwolf": "BrokerWOLF",
     },
-    # Phrases suggesting an IN-HOUSE / already-contracted TC (stronger "taken" tell).
+    # Phrases that say they're HIRING a TC → they need help NOW (a hot lead, not taken).
+    # Checked BEFORE in-house phrases, because "hiring a transaction coordinator"
+    # also contains "transaction coordinator".
+    "hiring_tc_phrases": [
+        "hiring a transaction coordinator", "we are hiring a transaction coordinator",
+        "seeking a transaction coordinator", "transaction coordinator wanted",
+        "now hiring transaction coordinator", "transaction coordinator position",
+        "join our team as a transaction coordinator",
+    ],
+    # Phrases suggesting an IN-HOUSE / already-contracted TC (a "taken" tell).
     "in_house_tc_phrases": [
-        "transaction coordinator", "transaction coordination", "our transaction team",
-        "in-house tc", "closing coordinator", "transaction management department",
+        "our transaction coordinator", "in-house transaction coordinator",
+        "our in-house tc", "transaction coordination team", "our transaction team",
+        "closing coordinator", "transaction management department",
+        "our tc handles", "dedicated transaction coordinator",
     ],
 
-    # Enrichment: pages we try, and what counts as an "agent card" (volume proxy).
-    "roster_paths": ["/agents", "/our-agents", "/team", "/our-team",
-                     "/agent-roster", "/about/team", "/meet-the-team"],
-    "agent_card_patterns": [r'href="[^"]*/agent[s]?/', r"dre\s*#|license\s*#|lic\s*#",
-                            r'class="[^"]*agent[-_ ]?card'],
-    "decision_maker_titles": ["broker/owner", "designated broker", "managing broker",
-                              "broker", "owner", "office manager", "team lead", "principal"],
+    # Enrichment: pages we try, and a fallback "agent card" container pattern.
+    "roster_paths": ["/agents", "/our-agents", "/team", "/our-team", "/agent-roster",
+                     "/about/team", "/meet-the-team", "/associates", "/realtors",
+                     "/careers", "/join", "/about", "/contact"],
+    "agent_card_patterns": [r'class="[^"]*agent[-_ ]?card', r'class="[^"]*team[-_ ]?member',
+                            r'class="[^"]*roster[-_ ]?item'],
+    "decision_maker_titles": ["broker/owner", "broker / owner", "designated broker",
+                              "managing broker", "principal broker", "owner/broker",
+                              "broker associate", "office manager", "team lead",
+                              "principal", "broker", "owner"],
 
     # Scoring weights / tiers.
-    "weights": {"per_agent": 1.0, "volume_cap": 50, "gap_open": 40, "gap_software": 20,
-                "gap_in_house": 5, "has_phone": 5, "has_contact": 5,
+    "weights": {"per_agent": 1.2, "volume_cap": 50, "gap_open": 35, "gap_hiring": 50,
+                "gap_software": 20, "gap_in_house": 5, "has_phone": 5, "has_contact": 8,
                 "suppression_penalty": -100},
     "tier_a_min": 55, "tier_b_min": 30,
 }
@@ -71,15 +85,26 @@ def _suppression(config: dict) -> dict:
 
 
 # ──────────────────────────── enrichment hook ────────────────────────────────
-def _fingerprint_tc(html_blob: str, config: dict) -> dict:
-    h = (html_blob or "").lower()
-    for phrase in config["in_house_tc_phrases"]:
-        if phrase in h:
-            return {"tc_gap": "in_house", "tc_software": "", "evidence": phrase}
+def fingerprint_tc(pages: dict, config: dict) -> dict:
+    """Classify a brokerage's TC situation from its fetched pages.
+
+    Priority order matters:
+      1. HIRING a TC      → 'hiring'  (they need help now — the hottest gap)
+      2. IN-HOUSE TC      → 'in_house'(already covered by a person)
+      3. TM SOFTWARE      → 'software'(tooling, maybe no human — still pitchable)
+      4. nothing          → 'open'    (no signal — strong lead)
+    """
+    hiring = find_phrases(pages, config["hiring_tc_phrases"])
+    if hiring:
+        return {"tc_gap": "hiring", "tc_software": "", "tc_evidence": hiring[0]}
+    in_house = find_phrases(pages, config["in_house_tc_phrases"])
+    if in_house:
+        return {"tc_gap": "in_house", "tc_software": "", "tc_evidence": in_house[0]}
+    blob = "\n".join(pages.values()).lower()
     for sig, label in config["tc_software"].items():
-        if sig in h:
-            return {"tc_gap": "software", "tc_software": label, "evidence": label}
-    return {"tc_gap": "open", "tc_software": "", "evidence": ""}
+        if sig in blob:
+            return {"tc_gap": "software", "tc_software": label, "tc_evidence": label}
+    return {"tc_gap": "open", "tc_software": "", "tc_evidence": ""}
 
 
 def _enrich(rec: dict, ctx: dict) -> dict:
@@ -88,15 +113,20 @@ def _enrich(rec: dict, ctx: dict) -> dict:
     if not website:
         rec["tc_gap"] = "unknown"
         rec["agent_count"] = 0
+        rec["enrich_note"] = "no website to inspect"
         return rec
     pages = fetch_pages(website, config["roster_paths"])
-    blob = "\n".join(pages.values())
-    rec["agent_count"] = count_matches(pages, config["agent_card_patterns"])
-    fp = _fingerprint_tc(blob, config)
-    rec.update(fp)
+    if not pages:
+        rec["tc_gap"] = "unknown"
+        rec["agent_count"] = 0
+        rec["enrich_note"] = "site unreachable"
+        return rec
+    rec["agent_count"] = estimate_roster(pages, config["agent_card_patterns"])
+    rec.update(fingerprint_tc(pages, config))
     name, title = find_decision_maker(pages, config["decision_maker_titles"])
     rec["decision_maker"] = name
     rec["dm_title"] = title
+    rec["enrich_note"] = f"read {len(pages)} page(s)"
     return rec
 
 
@@ -114,10 +144,11 @@ def _score(rec: dict) -> tuple[int, str, str]:
         reasons.append("volume unknown")
 
     gap = rec.get("tc_gap", "unknown")
-    gscore = {"open": w["gap_open"], "software": w["gap_software"],
-              "in_house": w["gap_in_house"]}.get(gap, 0)
+    gscore = {"hiring": w["gap_hiring"], "open": w["gap_open"],
+              "software": w["gap_software"], "in_house": w["gap_in_house"]}.get(gap, 0)
     score += gscore
-    reasons.append({"open": "no TC detected — OPEN",
+    reasons.append({"hiring": "HIRING a TC — needs help now",
+                    "open": "no TC detected — OPEN",
                     "software": f"uses {rec.get('tc_software') or 'TM software'}",
                     "in_house": "in-house TC signals",
                     "unknown": "TC status unknown"}.get(gap, "TC status unknown"))
@@ -146,6 +177,9 @@ def _opener(rec: dict) -> str:
     gap = rec.get("tc_gap")
     if rec.get("suppressed"):
         return f"Already with {rec.get('suppressed_by','a competitor')} — revisit on contract churn."
+    if gap == "hiring":
+        return (f"{size}brokerage actively hiring a TC — opener: instead of hiring, "
+                f"salary + benefits, you can outsource per-file to SimplyTC today.")
     if gap == "open":
         return (f"{size}brokerage, no TC detected — opener: are your agents still "
                 f"doing their own contract-to-close paperwork?")
