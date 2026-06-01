@@ -20,6 +20,13 @@ dist/
 data-kit/sonoma_places.*
 data-kit/sonoma_businesses.*
 
+# Committed lead deliverables: the CSV/JSONL/xlsx exports + data dictionaries
+# under lead-tracker/data/export/ ARE tracked so the CRM build has the data on
+# hand. Overture is CC-BY; redistribution is fine with attribution (see the
+# DATA_DICTIONARY.md files). Heavy regenerable artifacts (.sqlite, raw parquet)
+# stay ignored via lead-tracker/.gitignore.
+!lead-tracker/data/export/**
+
 # IDE
 .vscode/
 .idea/

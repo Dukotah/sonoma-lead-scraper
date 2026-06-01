@@ -33,6 +33,16 @@ except ImportError:
     print("Installing openpyxl...")
     pip_install("openpyxl")
 
+def _get_fsspec():
+    """Lazily import fsspec/s3fs, installing s3fs if needed."""
+    try:
+        import fsspec
+    except ImportError:
+        print("Installing s3fs...")
+        pip_install("s3fs")
+        import fsspec
+    return fsspec
+
 # Sonoma County bounding box
 BBOX = {"south": 38.05, "west": -123.55, "north": 38.85, "east": -122.35}
 
@@ -67,22 +77,46 @@ WEAK_DOMAINS = [
 
 print("Connecting to DuckDB + Overture S3...")
 con = duckdb.connect()
-con.execute("INSTALL httpfs; LOAD httpfs;")
-con.execute("SET s3_region='us-west-2';")
+
+# Primary path: DuckDB's httpfs extension talks to S3 directly. It's the fastest
+# option, but it must download the extension binary from extensions.duckdb.org on
+# first use. Locked-down networks (corporate proxies, sandboxed CI, Claude Code on
+# the web) often allow the S3 data host but block the extension host. When that
+# happens we fall back to reading the same public bucket through fsspec/s3fs, which
+# only needs the S3 host itself. DuckDB routes s3:// reads through any registered
+# fsspec filesystem, so the rest of the script is unchanged.
+S3FS = None
+try:
+    con.execute("INSTALL httpfs; LOAD httpfs;")
+    con.execute("SET s3_region='us-west-2';")
+    print("  connection: DuckDB httpfs extension")
+except Exception as e:
+    print(f"  httpfs unavailable ({type(e).__name__}); falling back to fsspec/s3fs")
+    fsspec = _get_fsspec()
+    S3FS = fsspec.filesystem("s3", anon=True, client_kwargs={"region_name": "us-west-2"})
+    con.register_filesystem(S3FS)
+    print("  connection: fsspec/s3fs (anonymous)")
 
 
 def detect_latest_release() -> str:
-    """Return the newest Overture release string by globbing the places theme on S3.
+    """Return the newest Overture release string from S3.
     Falls back to FALLBACK_RELEASE if the lookup fails for any reason."""
     try:
-        pat = ("s3://overturemaps-us-west-2/release/202[0-9]-*"
-               "/theme=places/type=place/part-00000-*")
-        rows = con.execute(
-            "SELECT DISTINCT regexp_extract(file, 'release/([^/]+)/', 1) AS rel "
-            f"FROM glob('{pat}') WHERE rel <> '' ORDER BY rel DESC LIMIT 1"
-        ).fetchall()
-        if rows and rows[0][0]:
-            return rows[0][0]
+        if S3FS is not None:
+            rels = [p.rstrip("/").split("/")[-1]
+                    for p in S3FS.ls("overturemaps-us-west-2/release")]
+            rels = [r for r in rels if r[:3].isdigit() or r.startswith("202")]
+            if rels:
+                return sorted(rels)[-1]
+        else:
+            pat = ("s3://overturemaps-us-west-2/release/202[0-9]-*"
+                   "/theme=places/type=place/part-00000-*")
+            rows = con.execute(
+                "SELECT DISTINCT regexp_extract(file, 'release/([^/]+)/', 1) AS rel "
+                f"FROM glob('{pat}') WHERE rel <> '' ORDER BY rel DESC LIMIT 1"
+            ).fetchall()
+            if rows and rows[0][0]:
+                return rows[0][0]
     except Exception as e:
         print(f"  (release auto-detect failed: {type(e).__name__}; using fallback {FALLBACK_RELEASE})")
     return FALLBACK_RELEASE
