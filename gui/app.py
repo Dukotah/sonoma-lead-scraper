@@ -37,6 +37,65 @@ OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_output")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 
+# ─────────────────────── bundled lead database ───────────────────────────────
+# The packaged .exe ships every lead we collected (wired in via LeadEngine.spec),
+# so the app opens straight into a searchable database with no internet. We load
+# it lazily on first browse and keep only the columns the table needs, to stay light.
+import csv as _csv
+
+BUNDLED_COUNTIES = ["sonoma", "napa", "marin", "mendocino", "lake", "solano"]
+BROWSE_COLS = ["name", "category", "tier", "score", "phone_fmt", "email",
+               "website", "city", "county", "pitch"]
+_BUNDLE: dict = {"rows": None}
+
+
+def _data_root() -> str:
+    """Locate the bundled datasets — sys._MEIPASS/leads_data when frozen, else the
+    repo's lead-tracker/data/export tree when running from source."""
+    base = getattr(sys, "_MEIPASS", None)
+    if base and os.path.isdir(os.path.join(base, "leads_data")):
+        return os.path.join(base, "leads_data")
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(repo, "lead-tracker", "data", "export")
+
+
+def _load_bundle() -> list:
+    if _BUNDLE["rows"] is not None:
+        return _BUNDLE["rows"]
+    root, rows = _data_root(), []
+    for county in BUNDLED_COUNTIES:
+        path = os.path.join(root, county, f"{county}_leads_full.csv")
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for r in _csv.DictReader(f):
+                row = {c: (r.get(c) or "") for c in BROWSE_COLS}
+                row["county"] = county.title()
+                rows.append(row)
+    _BUNDLE["rows"] = rows
+    return rows
+
+
+def _filter_bundle(rows: list, args) -> list:
+    q = (args.get("q") or "").strip().lower()
+    county = (args.get("county") or "").strip().lower()
+    tier = (args.get("tier") or "").strip().upper()
+
+    def ok(r):
+        if county and r.get("county", "").lower() != county:
+            return False
+        if tier and r.get("tier", "").upper() != tier:
+            return False
+        if q:
+            blob = " ".join(r.get(k, "") for k in
+                            ("name", "category", "city", "email", "website")).lower()
+            if q not in blob:
+                return False
+        return True
+
+    return [r for r in rows if ok(r)]
+
+
 # ───────────────────────────── job runner ────────────────────────────────────
 def run_job(job_id: str, params: dict):
     job = JOBS[job_id]
@@ -171,6 +230,50 @@ def download(kind, jid):
     return send_file(path, as_attachment=True, download_name=fname)
 
 
+@app.route("/leads/facets")
+def lead_facets():
+    """Counts for the browse filters — total, per-county, per-tier."""
+    rows = _load_bundle()
+    counties: dict = {}
+    tiers = {"A": 0, "B": 0, "C": 0}
+    for r in rows:
+        counties[r.get("county", "")] = counties.get(r.get("county", ""), 0) + 1
+        t = r.get("tier", "")
+        if t in tiers:
+            tiers[t] += 1
+    return jsonify({"total": len(rows), "counties": counties, "tiers": tiers})
+
+
+@app.route("/leads")
+def browse_leads():
+    """Paginated search over the bundled lead database."""
+    rows = _load_bundle()
+    filt = _filter_bundle(rows, request.args)
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        size = min(200, max(10, int(request.args.get("size", 50))))
+    except ValueError:
+        page, size = 1, 50
+    start = (page - 1) * size
+    return jsonify({"total": len(filt), "grand_total": len(rows),
+                    "page": page, "size": size, "cols": BROWSE_COLS,
+                    "rows": filt[start:start + size]})
+
+
+@app.route("/leads/export")
+def export_leads():
+    """Download the current filtered slice as a CSV."""
+    rows = _filter_bundle(_load_bundle(), request.args)
+    buf = io.StringIO()
+    w = _csv.DictWriter(buf, fieldnames=BROWSE_COLS, extrasaction="ignore")
+    w.writeheader()
+    for r in rows:
+        w.writerow(r)
+    data = io.BytesIO(buf.getvalue().encode("utf-8"))
+    return send_file(data, mimetype="text/csv", as_attachment=True,
+                     download_name="leads_export.csv")
+
+
 # ───────────────────────────── server bootstrap ──────────────────────────────
 def free_port(default=5000):
     for p in (default, 5001, 5050, 8000, 8080, 8765):
@@ -237,10 +340,64 @@ th{background:#eef2f7;position:sticky;top:0}
 .tierA{background:#e8f8ec}.tierB{background:#fff8e1}.tierC{background:#fdecee}
 .tablewrap{max-height:440px;overflow:auto;border-radius:9px;border:1px solid #e3e8ee;margin-top:14px;display:none}
 .note{background:#fff8e1;border-left:4px solid #f0c020;padding:9px 13px;border-radius:5px;font-size:12.5px;margin-top:8px}
+.tabs{display:flex;gap:6px;margin:0 0 18px;border-bottom:2px solid #e3e8ee}
+.tab{background:none;color:#667;border:none;border-bottom:3px solid transparent;border-radius:0;
+  padding:9px 16px;font-size:15px;font-weight:600;cursor:pointer}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab:hover{background:#eef2f7}
+#b_table{display:table}#b_wrap{display:none}
+#b_export{display:inline-block;padding:10px 16px;background:#34507a;color:#fff;
+  text-decoration:none;border-radius:8px;font-weight:600;font-size:14px}
+#b_count{font-size:13px;color:#566;margin:8px 2px}
 </style></head><body>
 <h1>Lead Finder</h1>
-<p class="sub">Find new business leads, score the best ones, and download a ready-to-call list. Free public data — no accounts, no API keys.</p>
+<p class="sub">Every lead we collected — searchable, scored, and ready to call — plus a tool to find more. Free public data, no accounts, no API keys.</p>
 
+<div class="tabs">
+  <button type="button" class="tab active" data-view="browse">📇 Browse all leads</button>
+  <button type="button" class="tab" data-view="find">🔍 Find new leads</button>
+</div>
+
+<div id="view-browse">
+  <div class="firsttime">
+    <b>This app already contains every lead we gathered</b> — 70,000+ businesses across Sonoma County and its five neighbors, each scored and with a suggested opener. Search below and download any slice as a spreadsheet. No internet needed.
+  </div>
+  <fieldset>
+    <legend>Search the lead database</legend>
+    <div class="row">
+      <div>
+        <label class="fld">Search</label>
+        <input type="text" id="b_q" placeholder="name, category, city, email… e.g. “plumber Santa Rosa”">
+      </div>
+      <div>
+        <label class="fld">County</label>
+        <select id="b_county"><option value="">All counties</option></select>
+      </div>
+      <div>
+        <label class="fld">Priority</label>
+        <select id="b_tier">
+          <option value="">All priorities</option>
+          <option value="A">🟢 Call first — no website</option>
+          <option value="B">🟡 Worth a call — DIY site</option>
+          <option value="C">🔴 Lower priority — has a real site</option>
+        </select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button type="button" id="b_search">🔎 Search</button>
+      <a id="b_export" href="#">⬇ Download these as a spreadsheet</a>
+    </div>
+  </fieldset>
+  <div id="b_count"></div>
+  <div class="tablewrap" id="b_wrap"><table id="b_table"></table></div>
+  <div class="btnrow" id="b_pager" style="display:none">
+    <button type="button" class="ghost" id="b_prev">‹ Prev</button>
+    <span id="b_page" class="sub" style="margin:0"></span>
+    <button type="button" class="ghost" id="b_next">Next ›</button>
+  </div>
+</div>
+
+<div id="view-find" style="display:none">
 <div class="firsttime">
   <b>First time?</b> Click <b>“Try a sample”</b> at the bottom — it runs instantly with no internet and shows you exactly what you’ll get. Then fill in the boxes below for a real search.
 </div>
@@ -326,6 +483,7 @@ th{background:#eef2f7;position:sticky;top:0}
   <div id="status"></div>
 </details>
 <div class="tablewrap" id="tablewrap"><table id="preview"></table></div>
+</div><!-- /view-find -->
 
 <script>
 const VERTS = {{ verticals|tojson }};
@@ -457,6 +615,60 @@ function renderTable(leads, columns){
   }
   table.innerHTML=h+"</tbody>"; table.style.display="table"; tablewrap.style.display="block";
 }
+
+// ───────────────────────── Browse-leads tab ────────────────────────────────
+const tabs=document.querySelectorAll(".tab");
+const views={browse:document.getElementById("view-browse"),find:document.getElementById("view-find")};
+tabs.forEach(t=>t.addEventListener("click",()=>{
+  tabs.forEach(x=>x.classList.remove("active")); t.classList.add("active");
+  for(const k in views) views[k].style.display=(k===t.dataset.view)?"block":"none";
+}));
+
+let bPage=1, bPages=1;
+const bFilter=()=>({q:document.getElementById("b_q").value.trim(),
+  county:document.getElementById("b_county").value,
+  tier:document.getElementById("b_tier").value});
+const bQS=p=>`q=${encodeURIComponent(p.q)}&county=${encodeURIComponent(p.county)}&tier=${encodeURIComponent(p.tier)}`;
+
+async function initBrowse(){
+  try{
+    const f=await (await fetch("/leads/facets")).json();
+    const sel=document.getElementById("b_county");
+    Object.keys(f.counties).sort().forEach(c=>{ if(!c) return;
+      const o=document.createElement("option");
+      o.value=c; o.textContent=`${c} (${(f.counties[c]||0).toLocaleString()})`; sel.appendChild(o); });
+  }catch(e){}
+  runBrowse(1);
+}
+
+async function runBrowse(page){
+  bPage=page; const p=bFilter();
+  let j;
+  try{ j=await (await fetch(`/leads?${bQS(p)}&page=${page}&size=50`)).json(); }
+  catch(e){ document.getElementById("b_count").textContent="Could not load the lead database."; return; }
+  document.getElementById("b_count").innerHTML=
+    `<b>${j.total.toLocaleString()}</b> of ${j.grand_total.toLocaleString()} leads match`;
+  document.getElementById("b_export").href=`/leads/export?${bQS(p)}`;
+  const wrap=document.getElementById("b_wrap"), tbl=document.getElementById("b_table"),
+        pager=document.getElementById("b_pager");
+  if(!j.rows.length){ wrap.style.display="none"; pager.style.display="none"; tbl.innerHTML=""; return; }
+  let h="<thead><tr>"+j.cols.map(c=>`<th>${esc(c)}</th>`).join("")+"</tr></thead><tbody>";
+  for(const r of j.rows){ const tier=r.tier||"C";
+    h+=`<tr class="tier${esc(tier)}">`+j.cols.map(c=>`<td>${esc(r[c])}</td>`).join("")+"</tr>"; }
+  tbl.innerHTML=h+"</tbody>"; wrap.style.display="block";
+  bPages=Math.max(1,Math.ceil(j.total/j.size));
+  pager.style.display="flex";
+  document.getElementById("b_page").textContent=`Page ${page.toLocaleString()} of ${bPages.toLocaleString()}`;
+  document.getElementById("b_prev").disabled=page<=1;
+  document.getElementById("b_next").disabled=page>=bPages;
+}
+document.getElementById("b_search").addEventListener("click",()=>runBrowse(1));
+document.getElementById("b_q").addEventListener("keydown",e=>{ if(e.key==="Enter") runBrowse(1); });
+document.getElementById("b_county").addEventListener("change",()=>runBrowse(1));
+document.getElementById("b_tier").addEventListener("change",()=>runBrowse(1));
+document.getElementById("b_prev").addEventListener("click",()=>runBrowse(Math.max(1,bPage-1)));
+document.getElementById("b_next").addEventListener("click",()=>runBrowse(Math.min(bPages,bPage+1)));
+initBrowse();
 </script>
 </body></html>"""
 
