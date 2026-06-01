@@ -37,15 +37,26 @@ def _dedupe(leads: list[dict]) -> list[dict]:
 def run_pipeline(vertical: Vertical, market: str, *,
                  sources=("overture",), limit: int | None = None,
                  enrich: bool = True, enrich_cap: int | None = 150,
-                 out_stem: str | None = None, log=print) -> list[dict]:
+                 out_stem: str | None = None, config_override: dict | None = None,
+                 log=print) -> list[dict]:
     """Run the full pipeline for one vertical in one market.
 
     sources: any of ("overture", "osm").
     enrich:  run the vertical's enrich_fn (fetches each business's site).
     enrich_cap: only enrich the top-N by collection order (cost control); None = all.
     out_stem: if set, also writes <stem>_crm.csv and <stem>.xlsx.
-    Returns the scored, sorted list of lead dicts.
+    config_override: shallow-merged over the vertical's config for THIS run only
+                     (e.g. competitor seed URLs typed into the GUI). The shared
+                     vertical object is never mutated.
+    Returns the scored, sorted list of lead dicts. Output file paths, when written,
+    are attached as run_pipeline.last_outputs = (csv_path, xlsx_path).
     """
+    run_pipeline.last_outputs = None
+    # Per-run config: copy so concurrent runs / the registry stay clean.
+    cfg = dict(vertical.config)
+    if config_override:
+        cfg.update(config_override)
+
     bbox, label = resolve_market(market)
     log(f"Market: {label}  bbox={tuple(round(x,3) for x in bbox)}")
 
@@ -75,13 +86,13 @@ def run_pipeline(vertical: Vertical, market: str, *,
     suppressed: dict[str, str] = {}
     if vertical.suppression_fn:
         log("Building competitor-suppression set…")
-        suppressed = vertical.suppression_fn(vertical.config) or {}
+        suppressed = vertical.suppression_fn(cfg) or {}
 
     # 3. ENRICH (per-business website visit) — parallel, capped
     if enrich and vertical.enrich_fn:
         targets = leads if enrich_cap is None else leads[:enrich_cap]
         log(f"Enriching {len(targets)} businesses (parallel)…")
-        ctx = {"config": vertical.config}
+        ctx = {"config": cfg}
         with ThreadPoolExecutor(max_workers=8) as ex:
             futs = {ex.submit(vertical.enrich_fn, r, ctx): r for r in targets}
             done = 0
@@ -113,7 +124,10 @@ def run_pipeline(vertical: Vertical, market: str, *,
 
     # 5. EXPORT
     if out_stem:
-        stem = re.sub(r"[^a-z0-9]+", "_", out_stem.lower())
-        write_outputs(leads, vertical.columns, stem, log)
+        # Slugify only the filename; keep any directory the caller supplied intact.
+        import os
+        d, base = os.path.split(out_stem)
+        stem = os.path.join(d, re.sub(r"[^a-z0-9]+", "_", base.lower()).strip("_"))
+        run_pipeline.last_outputs = write_outputs(leads, vertical.columns, stem, log)
 
     return leads

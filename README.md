@@ -22,6 +22,19 @@ python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich
 
 Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`.
 
+### Point-and-click GUI — `gui/`
+
+No command line needed: pick a vertical + market, paste competitor pages to skip,
+hit Run, watch live progress, download the CSV/XLSX.
+
+```bash
+cd gui && ./run.sh          # browser mode (run.bat on Windows)
+# or a native desktop window:
+python gui/desktop_app.py
+```
+
+See [`gui/README.md`](gui/README.md). End-to-end test: `python gui/test_gui.py`.
+
 **Add a new use case** = one file in `leadgen/verticals/` that calls
 `register(Vertical(...))` with a `score_fn` (and optional `enrich_fn`,
 `opener_fn`, `suppression_fn`). The `simply_tc` vertical shows the full pattern,

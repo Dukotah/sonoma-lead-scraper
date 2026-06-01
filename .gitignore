@@ -12,6 +12,10 @@ build/
 dist/
 *.spec
 
+# GUI run outputs (generated lead files)
+gui/_output/*
+!gui/_output/.gitkeep
+
 # Data files (don't commit huge parquet/csv to git)
 *.parquet
 *.csv

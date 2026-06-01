@@ -60,6 +60,11 @@ CONFIG = {
 # ─────────────────────────── suppression hook ────────────────────────────────
 def _suppression(config: dict) -> dict:
     seeds = config.get("competitor_tc_seeds") or {}
+    # Accept either {label: url} (config file) or [url, url, ...] (GUI textarea).
+    if isinstance(seeds, (list, tuple, set)):
+        from urllib.parse import urlparse
+        seeds = {(urlparse(u).hostname or f"competitor_{i}"): u
+                 for i, u in enumerate(seeds) if u and u.strip()}
     if not seeds:
         return {}
     return build_suppression_set(seeds)
@@ -166,6 +171,8 @@ COLUMNS = [
 register(Vertical(
     key="simply_tc",
     label="Transaction-coordinator leads (SimplyTC)",
+    description=("Real-estate brokerages/teams that likely need a transaction "
+                 "coordinator and aren't already using a competing TC company."),
     overture_categories=["real_estate"],
     osm_tags=["office=estate_agent", "shop=estate_agent"],
     keep_chains=True,          # a franchised office can still be an independent brokerage
@@ -174,5 +181,12 @@ register(Vertical(
     opener_fn=_opener,
     suppression_fn=_suppression,
     config=CONFIG,
+    competitor_input={
+        "config_key": "competitor_tc_seeds",
+        "label": "Competitor TC company pages (one URL per line)",
+        "help": ("Paste the testimonial / 'clients we serve' page URL for each rival "
+                 "transaction-coordination company. We scrape them to skip brokerages "
+                 "already using a competitor."),
+    },
     columns=COLUMNS,
 ))

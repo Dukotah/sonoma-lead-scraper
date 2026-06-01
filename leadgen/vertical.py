@@ -37,6 +37,14 @@ class Vertical:
     # --- config blob passed to hooks (fingerprints, competitor seeds, weights…) ---
     config: dict = field(default_factory=dict)
 
+    # --- one-line description shown in the GUI/CLI ---
+    description: str = ""
+
+    # --- GUI-editable competitor seeds: {config_key, label, help} or None ---
+    # When set, the GUI shows a textarea letting the user paste competitor client/
+    # testimonial URLs; they're merged into config[config_key] for that run only.
+    competitor_input: dict | None = None
+
     # --- output: (header, record_key) in column order ---
     columns: list[tuple[str, str]] = field(default_factory=list)
 
