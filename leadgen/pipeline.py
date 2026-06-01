@@ -132,9 +132,10 @@ def run_pipeline(vertical: Vertical, market: str, *,
         leads = [r for r in leads if not (r.get("brand"))]
         log(f"  dropped {before - len(leads)} chain/branded records")
 
-    # 2. SUPPRESSION (competitor clients) — build once, applied during scoring
+    # 2. SUPPRESSION (competitor clients) — build once, applied during scoring.
+    # Skipped in demo mode: it fetches competitor sites, and demo must stay offline.
     suppressed: dict[str, str] = {}
-    if vertical.suppression_fn:
+    if vertical.suppression_fn and not demo:
         log("Building competitor-suppression set…")
         suppressed = vertical.suppression_fn(cfg) or {}
 

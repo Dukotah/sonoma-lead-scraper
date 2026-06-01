@@ -226,9 +226,10 @@ COLUMNS = [
 
 register(Vertical(
     key="simply_tc",
-    label="Transaction-coordinator leads (SimplyTC)",
-    description=("Real-estate brokerages/teams that likely need a transaction "
-                 "coordinator and aren't already using a competing TC company."),
+    label="Real-estate brokerages that may need a transaction coordinator",
+    description=("Finds real-estate brokerages and teams that likely need a "
+                 "transaction coordinator — and skips the ones already using a "
+                 "competitor. Best leads first."),
     overture_categories=["real_estate"],
     osm_tags=["office=estate_agent", "shop=estate_agent"],
     keep_chains=True,          # a franchised office can still be an independent brokerage

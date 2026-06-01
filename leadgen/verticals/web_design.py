@@ -69,7 +69,9 @@ COLUMNS = [
 
 register(Vertical(
     key="web_design",
-    label="Web-design leads (businesses needing a website)",
+    label="Local businesses that need a website",
+    description=("Finds local businesses with no website, a social-only page, or "
+                 "a weak/outdated site — good prospects for web-design work."),
     overture_categories=[],          # all categories; broad by design
     osm_tags=["craft=plumber", "craft=electrician", "shop=car_repair",
               "shop=hairdresser", "amenity=restaurant", "office=lawyer"],

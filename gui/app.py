@@ -184,7 +184,8 @@ def free_port(default=5000):
 
 
 INDEX_HTML = """<!doctype html><html><head><meta charset="utf-8">
-<title>Lead Engine</title>
+<title>Lead Finder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{--blue:#1F4E78;--green:#28a745}
 *{box-sizing:border-box}
@@ -193,6 +194,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;
 h1{margin:0 0 2px}.sub{color:#667;margin:0 0 18px;font-size:14px}
 fieldset{border:1px solid #dde2e8;border-radius:10px;margin:0 0 16px;padding:14px 16px;background:#fff}
 legend{padding:0 8px;font-weight:650;color:var(--blue)}
+.opt{font-weight:400;color:#889;font-size:12px}
+.firsttime{background:#eaf4ff;border:1px solid #bcdcff;border-radius:9px;padding:11px 14px;margin-bottom:16px;font-size:13.5px;line-height:1.5}
+details.adv{border:1px solid #e3e8ee;border-radius:9px;background:#fff;padding:6px 14px;margin:0 0 16px}
+details.adv>summary{cursor:pointer;font-weight:600;color:var(--blue);font-size:13.5px;padding:6px 0}
+.legend{display:none;margin-top:10px;font-size:12.5px;color:#566;background:#fff;border:1px solid #e3e8ee;border-radius:9px;padding:10px 13px;line-height:1.6}
 label.fld{display:block;font-size:13px;font-weight:600;margin:10px 0 4px;color:#445}
 input[type=text],input[type=number],select,textarea{
   width:100%;padding:9px 10px;font-size:14px;border:1px solid #c4ccd6;border-radius:7px;font-family:inherit}
@@ -232,85 +238,93 @@ th{background:#eef2f7;position:sticky;top:0}
 .tablewrap{max-height:440px;overflow:auto;border-radius:9px;border:1px solid #e3e8ee;margin-top:14px;display:none}
 .note{background:#fff8e1;border-left:4px solid #f0c020;padding:9px 13px;border-radius:5px;font-size:12.5px;margin-top:8px}
 </style></head><body>
-<h1>Lead Engine</h1>
-<p class="sub">Scrape, enrich, score &amp; export sales leads — powered by open data (Overture Maps + OpenStreetMap).</p>
+<h1>Lead Finder</h1>
+<p class="sub">Find new business leads, score the best ones, and download a ready-to-call list. Free public data — no accounts, no API keys.</p>
+
+<div class="firsttime">
+  <b>First time?</b> Click <b>“Try a sample”</b> at the bottom — it runs instantly with no internet and shows you exactly what you’ll get. Then fill in the boxes below for a real search.
+</div>
 
 <form id="form">
   <fieldset>
-    <legend>1 · What to find</legend>
-    <label class="fld">Vertical</label>
+    <legend>1 · What kind of leads?</legend>
+    <label class="fld">Type of business to find</label>
     <select id="vertical"></select>
     <div class="vdesc" id="vdesc"></div>
   </fieldset>
 
   <fieldset>
-    <legend>2 · Where</legend>
+    <legend>2 · Where should we look?</legend>
     <div class="row">
       <div>
-        <label class="fld">Market</label>
-        <input type="text" id="market" list="markets" placeholder="e.g. Austin, Texas  or  sonoma_county_ca">
+        <label class="fld">Area</label>
+        <input type="text" id="market" list="markets" placeholder="e.g. Santa Rosa, California">
         <datalist id="markets">{% for m in markets %}<option value="{{m}}">{% endfor %}</datalist>
-        <div class="hint">A saved market key, or any place name (we geocode it).</div>
+        <div class="hint">Type any city, county, or metro — for example “Austin, Texas”. A few saved areas are in the dropdown.</div>
       </div>
       <div>
-        <label class="fld">Data sources</label>
+        <label class="fld">Where the data comes from</label>
         <div class="checks" style="padding-top:8px">
-          <label><input type="checkbox" id="src_overture" checked> Overture (bulk, national)</label>
-          <label><input type="checkbox" id="src_osm"> OpenStreetMap (live)</label>
+          <label><input type="checkbox" id="src_overture" checked> Nationwide business directory</label>
+          <label><input type="checkbox" id="src_osm"> Live map data</label>
         </div>
-        <div class="hint">Overture needs the <code>duckdb</code> package; OSM works without it.</div>
+        <div class="hint">Leave these as-is unless a search comes back empty — then try ticking the other box.</div>
       </div>
     </div>
   </fieldset>
 
   <fieldset id="competitor_box" style="display:none">
-    <legend>3 · Skip competitors' clients</legend>
+    <legend>3 · Skip anyone already using a competitor <span class="opt">(optional)</span></legend>
     <label class="fld" id="competitor_label"></label>
-    <textarea id="competitor_urls" placeholder="https://a-rival-tc.com/testimonials&#10;https://another-tc.com/clients"></textarea>
+    <textarea id="competitor_urls" placeholder="https://a-competitor.com/testimonials&#10;https://another-competitor.com/reviews"></textarea>
     <div class="hint" id="competitor_help"></div>
+    <div class="hint">Already pre-filled with known competitors — you can add more, one web address per line.</div>
   </fieldset>
 
   <fieldset>
-    <legend>4 · Skip people already in your CRM <span style="font-weight:400;color:#889">(optional)</span></legend>
-    <label class="fld">Upload your current CRM export (.csv)</label>
+    <legend>4 · Skip people already in your CRM <span class="opt">(optional)</span></legend>
+    <label class="fld">Upload your current contact list (.csv)</label>
     <input type="file" id="crm_file" accept=".csv,text/csv">
     <div class="hint" id="crm_status">We match on company name and remove anyone you already have — so you never get a duplicate.</div>
   </fieldset>
 
-  <fieldset>
-    <legend>Options</legend>
-    <div class="row">
+  <details class="adv">
+    <summary>Advanced options</summary>
+    <div class="row" style="margin-top:10px">
       <div>
-        <label class="fld"><input type="checkbox" id="enrich" checked style="width:auto"> Enrich (visit each site)</label>
-        <div class="hint">Estimates volume &amp; detects competitor/TC signals. Slower but far richer.</div>
+        <label class="fld"><input type="checkbox" id="enrich" checked style="width:auto"> Visit each website for deeper detail</label>
+        <div class="hint">Estimates company size and detects competitor/coordinator signals. Richer results, a bit slower. Recommended on.</div>
       </div>
       <div>
-        <label class="fld">Enrich cap (top N)</label>
+        <label class="fld">Deep-check at most this many</label>
         <input type="number" id="enrich_cap" value="150" min="0">
       </div>
       <div>
-        <label class="fld">Collect limit (optional)</label>
-        <input type="number" id="limit" placeholder="all">
+        <label class="fld">Stop after this many found</label>
+        <input type="number" id="limit" placeholder="no limit">
       </div>
     </div>
-  </fieldset>
+  </details>
 
   <div class="btnrow">
-    <button type="submit" id="go">Run</button>
-    <button type="button" id="demo" class="ghost">▶ Try a demo (no internet needed)</button>
+    <button type="submit" id="go">🔍 Find leads</button>
+    <button type="button" id="demo" class="ghost">▶ Try a sample (no internet needed)</button>
     <button type="button" id="check" class="ghost">📡 Check my connection</button>
   </div>
   <div id="checkout"></div>
 </form>
 
 <div id="summary" class="row">
-  <div class="stat"><b id="s_total">0</b>total</div>
-  <div class="stat A"><b id="s_A">0</b>Tier A</div>
-  <div class="stat B"><b id="s_B">0</b>Tier B</div>
-  <div class="stat C"><b id="s_C">0</b>Tier C</div>
+  <div class="stat"><b id="s_total">0</b>leads found</div>
+  <div class="stat A"><b id="s_A">0</b>🟢 Call first</div>
+  <div class="stat B"><b id="s_B">0</b>🟡 Worth a call</div>
+  <div class="stat C"><b id="s_C">0</b>🔴 Lower priority</div>
 </div>
 <div id="dls" class="row"></div>
-<div id="status"></div>
+<div id="legend" class="legend"></div>
+<details id="logwrap" class="adv" style="display:none"><summary>Show activity log</summary>
+  <div id="status"></div>
+</details>
 <div class="tablewrap" id="tablewrap"><table id="preview"></table></div>
 
 <script>
@@ -336,7 +350,11 @@ const form=document.getElementById("form"), go=document.getElementById("go");
 const demoBtn=document.getElementById("demo"), checkBtn=document.getElementById("check");
 const checkout=document.getElementById("checkout");
 const statusEl=document.getElementById("status"), summary=document.getElementById("summary");
+const logwrap=document.getElementById("logwrap"), legend=document.getElementById("legend");
 const dls=document.getElementById("dls"), tablewrap=document.getElementById("tablewrap"), table=document.getElementById("preview");
+const GO_LABEL="🔍 Find leads";
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c])); }
 
 // Read an uploaded CRM .csv into memory (text) so the server can dedupe against it.
 let crmText="";
@@ -364,25 +382,27 @@ function baseBody(){
 }
 
 async function startRun(body){
-  go.disabled=true; demoBtn.disabled=true; go.textContent="Running…";
-  statusEl.style.display="block"; statusEl.textContent="Starting…"; checkout.innerHTML="";
-  summary.style.display="none"; dls.style.display="none"; tablewrap.style.display="none"; table.style.display="none";
+  go.disabled=true; demoBtn.disabled=true; go.textContent="Working…";
+  logwrap.style.display="block"; statusEl.style.display="block"; statusEl.textContent="Starting…"; checkout.innerHTML="";
+  summary.style.display="none"; dls.style.display="none"; legend.style.display="none";
+  tablewrap.style.display="none"; table.style.display="none";
   const r=await fetch("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const j=await r.json();
-  if(j.error){ statusEl.textContent="Couldn't start: "+j.error; go.disabled=false; demoBtn.disabled=false; go.textContent="Run"; return; }
+  if(j.error){ checkout.innerHTML=`<div class="banner bad">${esc(j.error)}</div>`;
+    go.disabled=false; demoBtn.disabled=false; go.textContent=GO_LABEL; return; }
   poll(j.job_id);
 }
 
 form.addEventListener("submit", e=>{
   e.preventDefault();
   const body=baseBody();
-  if(!body.market.trim()){ alert("Enter a market, or click 'Try a demo'."); return; }
-  if(!body.sources.length){ alert("Pick at least one data source."); return; }
+  if(!body.market.trim()){ alert("Type an area to search, or click “Try a sample”."); return; }
+  if(!body.sources.length){ alert("Leave at least one data source ticked under “Where the data comes from”."); return; }
   body.demo=false; startRun(body);
 });
 
 demoBtn.addEventListener("click", ()=>{
-  const body=baseBody(); body.demo=true; body.market=body.market||"(demo)";
+  const body=baseBody(); body.demo=true; body.market=body.market||"(sample)";
   startRun(body);
 });
 
@@ -404,9 +424,9 @@ function poll(jid){
     const r=await fetch("/progress/"+jid); const j=await r.json();
     statusEl.textContent=j.log.join("\\n"); statusEl.scrollTop=statusEl.scrollHeight;
     if(j.done){
-      clearInterval(t); go.disabled=false; demoBtn.disabled=false; go.textContent="Run";
-      if(j.error){ checkout.innerHTML=`<div class="banner bad">${j.error}</div>`; }
-      if(j.notice){ checkout.innerHTML=`<div class="banner warn">${j.notice}</div>`; }
+      clearInterval(t); go.disabled=false; demoBtn.disabled=false; go.textContent=GO_LABEL;
+      if(j.error){ checkout.innerHTML=`<div class="banner bad">${esc(j.error)}</div>`; }
+      if(j.notice){ checkout.innerHTML=`<div class="banner warn">${esc(j.notice)}</div>`; }
       if(j.stats){
         summary.style.display="flex";
         s_total.textContent=j.stats.total; s_A.textContent=j.stats.A;
@@ -414,20 +434,26 @@ function poll(jid){
       }
       if(j.files && (j.files.csv||j.files.xlsx)){
         dls.style.display="flex"; dls.innerHTML="";
-        if(j.files.csv) dls.innerHTML+=`<a class="dl" href="/download/csv/${jid}">⬇ CRM CSV</a>`;
-        if(j.files.xlsx) dls.innerHTML+=`<a class="dl alt" href="/download/xlsx/${jid}">⬇ Tiered XLSX</a>`;
+        if(j.files.xlsx) dls.innerHTML+=`<a class="dl" href="/download/xlsx/${jid}">⬇ Download spreadsheet (Excel)</a>`;
+        if(j.files.csv) dls.innerHTML+=`<a class="dl alt" href="/download/csv/${jid}">⬇ Download for CRM (.csv)</a>`;
       }
-      if(j.leads && j.columns) renderTable(j.leads, j.columns);
+      if(j.leads && j.leads.length){
+        legend.style.display="block";
+        legend.innerHTML="<b>How to read this:</b> 🟢 <b>Call first</b> = best fit, contact these today · "
+          +"🟡 <b>Worth a call</b> = good but verify on the call · 🔴 <b>Lower priority</b> = weak fit or already taken. "
+          +"The full list (with phone, website, why it's a lead, and a suggested opener) is in the downloads above.";
+        renderTable(j.leads, j.columns);
+      }
     }
   }, 700);
 }
 
 function renderTable(leads, columns){
   const cols = columns.slice(0, 9); // keep the preview readable
-  let h="<thead><tr>"+cols.map(c=>`<th>${c[0]}</th>`).join("")+"</tr></thead><tbody>";
+  let h="<thead><tr>"+cols.map(c=>`<th>${esc(c[0])}</th>`).join("")+"</tr></thead><tbody>";
   for(const r of leads){
     const tier=r.tier||"C";
-    h+=`<tr class="tier${tier}">`+cols.map(c=>`<td>${(r[c[1]]??"")}</td>`).join("")+"</tr>";
+    h+=`<tr class="tier${esc(tier)}">`+cols.map(c=>`<td>${esc(r[c[1]])}</td>`).join("")+"</tr>";
   }
   table.innerHTML=h+"</tbody>"; table.style.display="table"; tablewrap.style.display="block";
 }
