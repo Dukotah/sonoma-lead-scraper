@@ -87,6 +87,31 @@ def test_export_csv_uses_vertical_columns():
     assert "Brokerage" in content and "X Brokerage" in content and "Tier" in content
 
 
+def test_overture_norm_and_category_filter():
+    # Pure helpers behind the pyarrow/S3 fallback — exercised without network.
+    from leadgen.sources import _overture_norm, _cat_match
+    row = {
+        "names": {"primary": "Acme Plumbing"},
+        "categories": {"primary": "plumbing", "alternate": ["contractor"]},
+        "websites": ["https://acme.example"], "phones": ["707-555-0000"], "emails": [],
+        "addresses": [{"freeform": "1 Main St", "locality": "Santa Rosa",
+                       "region": "CA", "postcode": "95401"}],
+        "brand": None, "bbox": {"xmin": -122.7, "ymin": 38.4},
+    }
+    rec = _overture_norm(row)
+    assert rec["name"] == "Acme Plumbing" and rec["category"] == "plumbing"
+    assert rec["website"] == "https://acme.example" and rec["phone"] == "707-555-0000"
+    assert rec["city"] == "Santa Rosa" and rec["zip"] == "95401"
+    assert rec["lat"] == 38.4 and rec["lon"] == -122.7
+    assert rec["source"] == "overture" and rec["email"] is None
+    # category substring filter mirrors the DuckDB LIKE clause (primary only)
+    assert _cat_match("plumbing", ["plumb"]) and _cat_match("plumbing", None)
+    assert not _cat_match("restaurant", ["plumb"])
+    # missing/empty fields degrade gracefully (no KeyError)
+    empty = _overture_norm({})
+    assert empty["name"] is None and empty["category"] == "" and empty["brand"] is None
+
+
 def _run_all():
     fns = [g for n, g in sorted(globals().items()) if n.startswith("test_")]
     failed = 0

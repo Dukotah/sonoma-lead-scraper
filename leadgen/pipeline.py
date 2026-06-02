@@ -75,6 +75,7 @@ def run_pipeline(vertical: Vertical, market: str, *,
                  enrich: bool = True, enrich_cap: int | None = 150,
                  out_stem: str | None = None, config_override: dict | None = None,
                  exclude_names: set | None = None, demo: bool = False,
+                 overture_categories: list | None = None,
                  log=print) -> list[dict]:
     """Run the full pipeline for one vertical in one market.
 
@@ -87,6 +88,8 @@ def run_pipeline(vertical: Vertical, market: str, *,
                      vertical object is never mutated.
     exclude_names: normalized company names to drop (e.g. the user's existing CRM)
                    — see load_crm_names(). Matches are removed, not just flagged.
+    overture_categories: category substrings to filter Overture by, overriding the
+                     vertical's defaults (e.g. ["plumbing"] for a plumbers-only run).
     demo: if True, use bundled offline sample data + fixture enrichment (no network).
     Returns the scored, sorted list of lead dicts. Output file paths, when written,
     are attached as run_pipeline.last_outputs = (csv_path, xlsx_path).
@@ -107,8 +110,10 @@ def run_pipeline(vertical: Vertical, market: str, *,
         bbox, label = resolve_market(market)
         log(f"Market: {label}  bbox={tuple(round(x,3) for x in bbox)}")
         if "overture" in sources:
+            # An explicit --category overrides the vertical's default category set.
+            cats = overture_categories if overture_categories is not None else vertical.overture_categories
             try:
-                leads += overture_collect(bbox, vertical.overture_categories, limit, log)
+                leads += overture_collect(bbox, cats, limit, log)
             except Exception as e:
                 log(f"  Overture failed: {e}")
         if "osm" in sources and vertical.osm_tags:

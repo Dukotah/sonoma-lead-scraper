@@ -5,3 +5,6 @@ requests>=2.31
 openpyxl>=3.1
 # Optional: only needed for the Overture (bulk) data source
 duckdb>=0.9
+# Fallback Overture reader for locked-down networks where DuckDB can't fetch its
+# httpfs extension (CI, sandboxes) — reads the same parquet straight from S3.
+pyarrow>=14.0

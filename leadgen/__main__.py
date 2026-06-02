@@ -25,6 +25,9 @@ def main(argv=None) -> int:
     ap.add_argument("--sources", nargs="+", default=["overture"],
                     choices=["overture", "osm"], help="data sources to collect from")
     ap.add_argument("--limit", type=int, help="cap businesses collected")
+    ap.add_argument("--category", nargs="+", metavar="SUBSTR",
+                    help="filter Overture to these category substrings (e.g. plumbing "
+                         "electrician); overrides the vertical's default categories")
     ap.add_argument("--enrich-cap", type=int, default=150,
                     help="enrich only the top-N businesses (cost control)")
     ap.add_argument("--no-enrich", action="store_true", help="skip per-site enrichment")
@@ -61,7 +64,8 @@ def main(argv=None) -> int:
         vertical, args.market or "demo",
         sources=tuple(args.sources), limit=args.limit,
         enrich=not args.no_enrich, enrich_cap=args.enrich_cap,
-        out_stem=out_stem, demo=args.demo, log=log,
+        out_stem=out_stem, demo=args.demo,
+        overture_categories=args.category, log=log,
     )
 
     if args.json:

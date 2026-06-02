@@ -20,6 +20,7 @@ from .audit import UA
 
 # ───────────────────────── Overture (bulk, national) ─────────────────────────
 FALLBACK_RELEASE = "2026-05-20.0"
+OVERTURE_BUCKET = "overturemaps-us-west-2"
 
 
 def _overture_release(con) -> str:
@@ -37,17 +38,116 @@ def _overture_release(con) -> str:
     return FALLBACK_RELEASE
 
 
+def _cat_match(primary: str | None, categories: list[str] | None) -> bool:
+    """True if no filter, or a category substring matches the primary category —
+    mirrors the DuckDB `lower(categories.primary) LIKE '%c%'` clause exactly."""
+    if not categories:
+        return True
+    p = (primary or "").lower()
+    return any(c.lower() in p for c in categories)
+
+
+def _overture_norm(row: dict) -> dict:
+    """Flatten one Overture place row (nested structs) to a lead dict. Pure: shared by
+    the pyarrow fallback and unit-tested without network. Matches the DuckDB columns."""
+    def first(x):
+        return x[0] if isinstance(x, list) and x else None
+    cats = row.get("categories") or {}
+    addrs = row.get("addresses") or []
+    a = (addrs[0] if addrs else None) or {}
+    bb = row.get("bbox") or {}
+    brand = row.get("brand")
+    bname = ((brand.get("names") or {}).get("primary")) if isinstance(brand, dict) else None
+    return {
+        "name": (row.get("names") or {}).get("primary"),
+        "category": cats.get("primary") or "",
+        "website": first(row.get("websites")),
+        "phone": first(row.get("phones")),
+        "email": first(row.get("emails")),
+        "address": a.get("freeform"),
+        "city": a.get("locality"),
+        "state": a.get("region"),
+        "zip": a.get("postcode"),
+        "brand": bname,
+        "lon": bb.get("xmin"),
+        "lat": bb.get("ymin"),
+        "source": "overture",
+        "source_url": "",
+    }
+
+
+def _overture_latest_release_s3(s3, pafs) -> str:
+    """Newest release folder name by listing the bucket (no httpfs needed)."""
+    try:
+        sel = pafs.FileSelector(f"{OVERTURE_BUCKET}/release", recursive=False)
+        dirs = [i.base_name for i in s3.get_file_info(sel)
+                if i.type == pafs.FileType.Directory and i.base_name[:4].isdigit()]
+        if dirs:
+            return sorted(dirs)[-1]
+    except Exception:
+        pass
+    return FALLBACK_RELEASE
+
+
+def _overture_pyarrow(bbox, categories, limit, log) -> list[dict]:
+    """Fallback collector: read Overture Places parquet straight from S3 with pyarrow.
+    Used when DuckDB's httpfs extension can't be installed (locked-down networks, CI,
+    the web sandbox). S3 needs only plain HTTPS — no extension download — and pyarrow
+    pushes the bbox filter into the parquet row-group statistics, so it reads only the
+    handful of row groups covering the market."""
+    try:
+        import pyarrow.dataset as pads
+        import pyarrow.fs as pafs
+    except ImportError:
+        raise RuntimeError("Overture pyarrow fallback needs pyarrow: pip install pyarrow")
+    south, west, north, east = bbox
+    s3 = pafs.S3FileSystem(anonymous=True, region="us-west-2")
+    release = _overture_latest_release_s3(s3, pafs)
+    base = f"{OVERTURE_BUCKET}/release/{release}/theme=places/type=place"
+    files = [i.path for i in s3.get_file_info(pafs.FileSelector(base))
+             if i.type == pafs.FileType.File]
+    if not files:
+        raise RuntimeError(f"no Overture place files under s3://{base}")
+    log(f"  Overture release {release} via pyarrow/S3 (httpfs unavailable); streaming bbox…")
+    dset = pads.dataset(files, filesystem=s3, format="parquet")
+    flt = ((pads.field("bbox", "xmin") >= west) & (pads.field("bbox", "xmin") <= east) &
+           (pads.field("bbox", "ymin") >= south) & (pads.field("bbox", "ymin") <= north))
+    cols = ["names", "categories", "websites", "phones", "emails",
+            "addresses", "brand", "bbox"]
+    out = []
+    for row in dset.to_table(filter=flt, columns=cols).to_pylist():
+        if not _cat_match((row.get("categories") or {}).get("primary"), categories):
+            continue
+        rec = _overture_norm(row)
+        if not rec["name"]:
+            continue
+        out.append(rec)
+        if limit and len(out) >= limit:
+            break
+    log(f"  Overture: {len(out)} businesses")
+    return out
+
+
 def overture_collect(bbox, categories: list[str] | None = None,
                      limit: int | None = None, log=print) -> list[dict]:
-    """Stream Overture Places for a bbox, optionally filtered to category substrings."""
+    """Stream Overture Places for a bbox, optionally filtered to category substrings.
+
+    Prefers DuckDB+httpfs (fast, predicate pushdown). If DuckDB is missing or its
+    httpfs extension can't be downloaded, transparently falls back to a pyarrow read
+    straight from S3 so the same command still works on locked-down networks."""
     try:
         import duckdb
     except ImportError:
-        raise RuntimeError("overture_collect needs duckdb: pip install duckdb")
+        log("  duckdb not installed; using pyarrow/S3 fallback…")
+        return _overture_pyarrow(bbox, categories, limit, log)
+    try:
+        con = duckdb.connect()
+        con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2';")
+    except Exception as e:
+        log(f"  DuckDB httpfs unavailable ({type(e).__name__}); using pyarrow/S3 fallback…")
+        return _overture_pyarrow(bbox, categories, limit, log)
 
     south, west, north, east = bbox
-    con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2';")
     release = _overture_release(con)
     log(f"  Overture release {release}; streaming bbox…")
     s3 = (f"s3://overturemaps-us-west-2/release/{release}"
