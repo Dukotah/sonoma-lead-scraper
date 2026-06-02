@@ -24,6 +24,13 @@ import os, re, sqlite3, argparse
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.normpath(os.path.join(HERE, "..", "data"))
 DB_PATH = os.environ.get("LEADS_DB", os.path.join(DATA, "leads.sqlite"))
+# Where the call sheet + warm CSV land, and an optional filename stem. Defaults
+# keep the original (data/warm_leads.csv, data/Monday_Call_Sheet.xlsx); the
+# all-county builder points these at data/export/<county>/ with a county stem.
+OUTDIR = os.environ.get("CALL_SHEET_DIR", DATA)
+PREFIX = os.environ.get("CALL_SHEET_PREFIX", "")
+_WARM_NAME = f"{PREFIX}_warm_leads.csv" if PREFIX else "warm_leads.csv"
+_XLSX_NAME = f"{PREFIX}_Call_Sheet.xlsx" if PREFIX else "Monday_Call_Sheet.xlsx"
 
 # Industry fit by keyword. A category matches the first bucket whose keywords
 # appear in it. There are ~1,100 distinct Overture categories, so we match on
@@ -148,7 +155,8 @@ def main():
 
     # ---- warm_leads.csv (everything callable & warm) ----
     import csv
-    csv_path = os.path.join(DATA, "warm_leads.csv")
+    os.makedirs(OUTDIR, exist_ok=True)
+    csv_path = os.path.join(OUTDIR, _WARM_NAME)
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(["rank", "outreach_score", "tier", "industry_fit", "business",
@@ -243,7 +251,7 @@ def main():
         ws3.cell(row=i + 3, column=4, value=a["a"])
     ws3.freeze_panes = "A4"
 
-    xlsx_path = os.path.join(DATA, "Monday_Call_Sheet.xlsx")
+    xlsx_path = os.path.join(OUTDIR, _XLSX_NAME)
     wb.save(xlsx_path)
     db.close()
 

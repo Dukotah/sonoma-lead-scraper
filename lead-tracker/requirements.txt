@@ -1,0 +1,5 @@
+# lead-tracker data-pipeline dependencies (build_all_counties.py and friends).
+duckdb>=0.9            # clean/de-chain/tier SQL + SQLite build (reads local parquet)
+s3fs>=2023.12.0       # anonymous Overture S3 reads via DuckDB's fsspec fallback
+openpyxl>=3.1         # call-sheet .xlsx
+requests>=2.31        # website audit scripts (audit_ci.py / audit_deep.py)

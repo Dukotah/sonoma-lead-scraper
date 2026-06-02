@@ -1,0 +1,62 @@
+name: Scrape Leads
+
+# Re-scrapes the full multi-county lead dataset from Overture Maps and commits
+# the refreshed deliverables under lead-tracker/data/export/ (per-county folders
+# + ALL_COUNTIES_* + REGION_SUMMARY.md). This is the same
+# lead-tracker/scripts/build_all_counties.py that runs inside the agent sandbox
+# — Overture is reached over anonymous S3 (no httpfs), so it works either place.
+# Run it by hand from the Actions tab (optionally a subset of counties), or let
+# the monthly schedule pick up each new Overture release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      counties:
+        description: "Counties to scrape (space-separated, or 'all')"
+        default: all
+  schedule:
+    - cron: "0 6 5 * *"   # 5th of each month, 06:00 UTC (after Overture's monthly release)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape-leads
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --quiet -r lead-tracker/requirements.txt
+
+      - name: Scrape all counties
+        env:
+          COUNTIES: ${{ github.event.inputs.counties || 'all' }}
+        run: |
+          set -e
+          if [ "$COUNTIES" = "all" ] || [ -z "$COUNTIES" ]; then
+            python lead-tracker/scripts/build_all_counties.py
+          else
+            python lead-tracker/scripts/build_all_counties.py --counties $COUNTIES
+          fi
+
+      - name: Commit refreshed dataset
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lead-tracker/data/export
+          if git diff --cached --quiet; then
+            echo "No dataset changes (already on the latest Overture release)."
+          else
+            git commit -m "ci: refresh lead dataset from Overture [skip ci]"
+            git push
+          fi

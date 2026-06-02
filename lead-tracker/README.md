@@ -66,6 +66,31 @@ npm run dev             # http://localhost:3030  → redirects to /leads
 If you already have `data/leads.sqlite` (e.g. it was handed to you), skip
 `build-db` and just `npm install && npm run dev`.
 
+## Scrape the whole dataset (all six counties) in one command
+
+`scripts/build_all_counties.py` regenerates everything committed under
+`data/export/` — the per-county folders **and** the combined
+`ALL_COUNTIES_leads_full.csv` (71,102 rows), `ALL_COUNTIES_dedup.csv` (51,271
+unique), and `REGION_SUMMARY.md` — straight from the latest Overture release.
+
+```bash
+pip install -r requirements.txt
+python scripts/build_all_counties.py                       # all six counties
+python scripts/build_all_counties.py --counties lake napa  # a subset
+python scripts/build_all_counties.py --export-root /tmp/x  # scratch (don't touch committed)
+```
+
+It chains the three scripts per county (`build_leads_db` → `make_call_sheet` →
+`export_full`) into a private SQLite DB, then assembles the combined files. It's
+**reproducible** — re-running on the same Overture release reproduces the
+committed CSVs byte-for-byte.
+
+**Runs inside a restricted agent sandbox.** The only network it touches is the
+public Overture S3 bucket, read anonymously via DuckDB's fsspec/s3fs fallback (no
+`httpfs` extension, no Overpass/geocoding). See [`docs/SANDBOX.md`](../docs/SANDBOX.md).
+On GitHub, the **Scrape Leads** Action (`.github/workflows/scrape-leads.yml`)
+runs it on a monthly schedule (or manual dispatch) and commits the refresh.
+
 ## Drop it into your existing Next.js app
 Your site is App Router (`app/`). Copy these in:
 

@@ -60,6 +60,25 @@ the sandbox blocks. **Use a named market** from `leadgen/geo.py::MARKETS`
 hard-coded bbox and need no network. Add more by dropping a bbox into that dict
 (grab coordinates from https://bboxfinder.com).
 
+## Regenerating the whole 71k dataset in-sandbox
+
+The committed lead dataset (`lead-tracker/data/export/` — ~71k businesses across
+Sonoma + 5 bordering counties) is fully reproducible from the sandbox:
+
+```bash
+pip install -r lead-tracker/requirements.txt
+python lead-tracker/scripts/build_all_counties.py
+```
+
+This uses `lead-tracker/scripts/build_leads_db.py`, whose DuckDB connection
+**falls back to anonymous fsspec/s3fs** when the `httpfs` extension host is
+blocked (it is, in-sandbox) — so the Overture pull, cleaning, tiering,
+enrichment, and export all run here. Verified: it reproduces every committed
+county count and the combined `ALL_COUNTIES_leads_full.csv` (71,102) /
+`ALL_COUNTIES_dedup.csv` (51,271) **byte-for-byte** on the same Overture release.
+The two Overture readers in this repo are independent and both sandbox-safe:
+`leadgen` uses pyarrow+s3fs; the lead-tracker pipeline uses DuckDB+fsspec.
+
 ### What to leave off in-sandbox
 
 - `--no-enrich` — per-business website fetches are blocked; enabling it just

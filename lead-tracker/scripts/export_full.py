@@ -17,8 +17,12 @@ import os, csv, json, sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.normpath(os.path.join(HERE, "..", "data"))
-OUT = os.path.join(DATA, "export")
+OUT = os.environ.get("EXPORT_DIR", os.path.join(DATA, "export"))
 DB_PATH = os.environ.get("LEADS_DB", os.path.join(DATA, "leads.sqlite"))
+# Filename stem + human label so one script serves every region. Defaults keep
+# the original Sonoma behavior; the all-county builder sets these per county.
+PREFIX = os.environ.get("EXPORT_PREFIX", "sonoma")
+REGION_LABEL = os.environ.get("REGION_LABEL", "Sonoma County")
 
 # Output columns in a sensible CRM order. (brand is always empty -> dropped.)
 COLUMNS = [
@@ -95,7 +99,7 @@ def main():
     n = len(rows)
 
     # CSV
-    csv_path = os.path.join(OUT, "sonoma_leads_full.csv")
+    csv_path = os.path.join(OUT, f"{PREFIX}_leads_full.csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(cols)
@@ -103,7 +107,7 @@ def main():
             w.writerow([r[c] for c in cols])
 
     # JSONL
-    jsonl_path = os.path.join(OUT, "sonoma_leads_full.jsonl")
+    jsonl_path = os.path.join(OUT, f"{PREFIX}_leads_full.jsonl")
     with open(jsonl_path, "w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps({c: r[c] for c in cols}, ensure_ascii=False) + "\n")
@@ -137,16 +141,16 @@ def main():
 
     # DATA_DICTIONARY.md
     md = []
-    md.append("# Sonoma County Business Leads — Data Dictionary\n")
+    md.append(f"# {REGION_LABEL} Business Leads — Data Dictionary\n")
     md.append(f"**{n:,} businesses** across **{len(niches):,} niches** and "
-              f"**{len(cities):,} cities** in Sonoma County, CA.\n")
+              f"**{len(cities):,} cities** in {REGION_LABEL}, CA.\n")
     md.append("Source: [Overture Maps](https://overturemaps.org) (CC-BY 4.0), "
               "cleaned, de-chained, and enriched. No web scraping.\n")
     md.append("## Files\n")
     md.append("| File | What |")
     md.append("|---|---|")
-    md.append("| `sonoma_leads_full.csv` | All leads, all columns (import this into the CRM). |")
-    md.append("| `sonoma_leads_full.jsonl` | Same data, one JSON object per line. |")
+    md.append(f"| `{PREFIX}_leads_full.csv` | All leads, all columns (import this into the CRM). |")
+    md.append(f"| `{PREFIX}_leads_full.jsonl` | Same data, one JSON object per line. |")
     md.append("| `niches.csv` | Every niche with its count. |")
     md.append("| `cities.csv` | Every city with its count. |")
     md.append("| `DATA_DICTIONARY.md` | This file. |\n")
@@ -176,7 +180,7 @@ def main():
 
     db.close()
     print(f"Exported {n:,} leads (all sectors) to {OUT}/")
-    for f in ("sonoma_leads_full.csv", "sonoma_leads_full.jsonl",
+    for f in (f"{PREFIX}_leads_full.csv", f"{PREFIX}_leads_full.jsonl",
               "niches.csv", "cities.csv", "DATA_DICTIONARY.md"):
         p = os.path.join(OUT, f)
         print(f"  {f:28} {os.path.getsize(p):>10,} bytes")
