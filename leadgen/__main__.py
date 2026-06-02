@@ -5,10 +5,13 @@ CLI for the universal lead engine.
     python -m leadgen --vertical simply_tc --market sonoma_county_ca --out sonoma_tc
     python -m leadgen --vertical simply_tc --market "Austin, Texas" --sources overture osm
     python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --limit 200
+    python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --json   # agent: structured stdout
+    python -m leadgen --vertical web_design --demo --json                                  # fully offline sample
 """
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from . import get_vertical, all_verticals, run_pipeline
@@ -25,6 +28,10 @@ def main(argv=None) -> int:
     ap.add_argument("--enrich-cap", type=int, default=150,
                     help="enrich only the top-N businesses (cost control)")
     ap.add_argument("--no-enrich", action="store_true", help="skip per-site enrichment")
+    ap.add_argument("--demo", action="store_true",
+                    help="run fully offline on bundled sample data (no network) — for testing / agents")
+    ap.add_argument("--json", action="store_true",
+                    help="emit scored leads as a JSON array on stdout (progress logs go to stderr)")
     ap.add_argument("--out", help="output filename stem (writes <stem>_crm.csv + <stem>.xlsx)")
     args = ap.parse_args(argv)
 
@@ -33,8 +40,8 @@ def main(argv=None) -> int:
             print(f"  {k:14s} {v.label}")
         return 0
 
-    if not args.vertical or not args.market:
-        ap.error("--vertical and --market are required (or use --list)")
+    if not args.vertical or (not args.market and not args.demo):
+        ap.error("--vertical and --market are required (or use --list, or --demo)")
 
     try:
         vertical = get_vertical(args.vertical)
@@ -42,12 +49,24 @@ def main(argv=None) -> int:
         print(e, file=sys.stderr)
         return 2
 
-    run_pipeline(
-        vertical, args.market,
+    # With --json, stdout is reserved for the JSON payload, so progress goes to stderr.
+    log = (lambda *a, **k: print(*a, file=sys.stderr)) if args.json else print
+    # A bare --json run is for an agent that just wants the data on stdout — don't
+    # write CSV/XLSX unless an explicit --out was given.
+    out_stem = args.out
+    if not out_stem and not args.json:
+        out_stem = f"{args.vertical}_{args.market or 'demo'}"
+
+    leads = run_pipeline(
+        vertical, args.market or "demo",
         sources=tuple(args.sources), limit=args.limit,
         enrich=not args.no_enrich, enrich_cap=args.enrich_cap,
-        out_stem=args.out or f"{args.vertical}_{args.market}",
+        out_stem=out_stem, demo=args.demo, log=log,
     )
+
+    if args.json:
+        json.dump(leads, sys.stdout, ensure_ascii=False, indent=2, default=str)
+        sys.stdout.write("\n")
     return 0
 
 

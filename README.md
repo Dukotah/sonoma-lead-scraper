@@ -41,15 +41,19 @@ Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`. Tests:
 > from the CLI, behind the GUI/`.exe`, on GitHub Actions, or imported/shelled-out by
 > an automation agent. It's not split into an "agent" build and a "local" build.
 
-**Skip enrichment for fast, hands-off runs — `--no-enrich`.** Enrichment is the
-per-site visit (fetch + audit each homepage) — the slow, flaky part. Skip it and the
-engine still collects, scores, and exports straight from the directory data, which is
-ideal for an agent or a quick pass:
+**Agent-friendly flags — `--no-enrich`, `--json`, `--demo`.** Enrichment is the
+per-site visit (fetch + audit each homepage) — the slow, flaky part. `--no-enrich`
+skips it; the engine still collects, scores, and exports straight from the directory
+data. `--json` streams the scored leads to stdout (logs to stderr) so an agent parses
+them directly; `--demo` runs on bundled sample data with zero network for a self-test.
 ```bash
-python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --out sonoma_quick
+# Agent run: no per-site fetching, structured output
+python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --json > leads.json
+# Fully offline self-test:
+python -m leadgen --vertical web_design --demo --json | head
 ```
-Scoring stays honest without it: no-website / social-only prospects still come back
-Tier A (no site visit needed), while businesses that have a site are marked
+Scoring stays honest without enrichment: no-website / social-only prospects still come
+back Tier A (no site visit needed), while businesses that have a site are marked
 "not audited" rather than guessed at.
 
 **Add a use case** = one file in `leadgen/verticals/` calling `register(Vertical(...))`

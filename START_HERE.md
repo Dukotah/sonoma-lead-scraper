@@ -63,20 +63,28 @@ python leadgen/tests/test_engine.py             # offline tests
 ```
 Outputs `<stem>_crm.csv` + color-tiered `<stem>.xlsx`.
 
-**Agent / no-enrich mode — `--no-enrich`.** Enrichment is the per-site visit step
-(fetch each business's homepage, audit it, crawl for contacts). It's the slow,
-flaky, hundreds-of-network-calls part — the bit you don't want an agent babysitting.
-`--no-enrich` skips it: the engine still collects (one bulk Overture/OSM query),
-de-dupes, scores, and exports — just from the directory data, no per-site fetches.
+**Agent mode — `--no-enrich` + `--json` (+ `--demo`).** These three flags make the
+engine clean for an automation agent to drive:
+
+| Flag | What it does | Why an agent wants it |
+|---|---|---|
+| `--no-enrich` | skip the per-site visit step (fetch+audit+contact-crawl) | enrichment is the slow, flaky, hundreds-of-network-calls part — the bit that strands a run. Skipping it still collects, de-dupes, scores, and exports from the directory data. |
+| `--json` | emit scored leads as a JSON array on **stdout**; progress logs go to **stderr** | structured output the agent parses directly (no XLSX). A bare `--json` writes no CSV/XLSX unless you also pass `--out`. |
+| `--demo` | run on bundled sample data with **zero network** | lets an agent smoke-test the engine + output shape offline before a real run. |
+
 ```bash
-python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --out sonoma_quick
+# Real run, agent-friendly: collect + score, no per-site fetching, JSON to stdout
+python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --json > leads.json
+# Fully offline self-test (no network at all):
+python -m leadgen --vertical web_design --demo --json | head
 ```
 The scorers degrade **honestly** under `--no-enrich`: `web_design` still surfaces the
 **no-website / social-only** leads as Tier A (those need no site visit to identify),
 and marks businesses that *have* a site as "not audited" rather than guessing;
 `simply_tc` reports "TC status unknown". Re-run without the flag to grade the
 has-a-site leads. (Note: collection still needs network for the directory query;
-`--no-enrich` removes the *per-site* fetching, which is the fragile part.)
+`--no-enrich` removes the *per-site* fetching, which is the fragile part. `--demo`
+needs no network at all.)
 
 ### Tool 2 — lead-tracker (local CRM)
 ```bash
