@@ -24,11 +24,17 @@ def _score(rec: dict) -> tuple[int, str, str]:
     score, reasons = 0, []
     site = rec.get("website") or ""
     weak, why = is_weak_url(site)
-    audit = rec.get("audit") or {}
+    audit = rec.get("audit")           # None when enrichment was skipped (--no-enrich)
     if not site:
         score += 60; reasons.append("NO WEBSITE"); tier = "A"
     elif weak:
         score += 40; reasons.append(f"non-site link ({why})"); tier = "A"
+    elif not audit:
+        # Has a real-looking site but enrichment was skipped — we have NOT inspected
+        # it, so don't fabricate an "unreachable" verdict. Honest, low-confidence
+        # lead: the no-website/social-only Tier-A leads above need no enrichment, but
+        # judging a live site does. Re-run without --no-enrich to grade these.
+        tier = "C"; reasons.append("has a site — not audited (run enrichment to grade)")
     else:
         tier = "C"
         if not audit.get("reachable"):

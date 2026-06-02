@@ -37,6 +37,21 @@ python -m leadgen --vertical simply_tc --market "Austin, Texas" --sources overtu
 Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`. Tests:
 `python leadgen/tests/test_engine.py`.
 
+> **One engine, driven any way.** `leadgen` is a single scraper — the same code runs
+> from the CLI, behind the GUI/`.exe`, on GitHub Actions, or imported/shelled-out by
+> an automation agent. It's not split into an "agent" build and a "local" build.
+
+**Skip enrichment for fast, hands-off runs — `--no-enrich`.** Enrichment is the
+per-site visit (fetch + audit each homepage) — the slow, flaky part. Skip it and the
+engine still collects, scores, and exports straight from the directory data, which is
+ideal for an agent or a quick pass:
+```bash
+python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --out sonoma_quick
+```
+Scoring stays honest without it: no-website / social-only prospects still come back
+Tier A (no site visit needed), while businesses that have a site are marked
+"not audited" rather than guessed at.
+
 **Add a use case** = one file in `leadgen/verticals/` calling `register(Vertical(...))`
 with a `score_fn` (and optional `enrich_fn`, `opener_fn`, `suppression_fn`). The
 `simply_tc` vertical shows the full pattern, including **competitor suppression** —

@@ -18,6 +18,13 @@ The **`LeadEngine` desktop app** (`gui/`, shippable as a Windows `.exe`) wraps b
 in a point-and-click window with a tab for each. Supporting: `data-kit/` (bulk
 Overture downloader + agent briefing); `legacy/` (archived first-gen scrapers).
 
+> **There is exactly ONE scraper — `leadgen/`.** It is *not* split into an "agent"
+> scraper and a "local" scraper. The same engine is driven four ways: the CLI
+> (`python -m leadgen`), the GUI/`.exe`, GitHub Actions, or imported/shelled-out by an
+> agent. So it is both agent-compatible and locally runnable — same code. The only
+> agent-*specific* asset is `data-kit/CLAUDE_AGENT_BRIEFING.md`, which is a **data
+> handoff doc**, not a second scraper. (`lead-tracker/` is the CRM and does no scraping.)
+
 ## Current state (what's built & working)
 
 - ✅ **`leadgen/` engine** — universal pipeline (collect → dedupe → enrich → suppress
@@ -55,6 +62,21 @@ python -m leadgen --vertical web_design --market sonoma_county_ca --out sonoma_w
 python leadgen/tests/test_engine.py             # offline tests
 ```
 Outputs `<stem>_crm.csv` + color-tiered `<stem>.xlsx`.
+
+**Agent / no-enrich mode — `--no-enrich`.** Enrichment is the per-site visit step
+(fetch each business's homepage, audit it, crawl for contacts). It's the slow,
+flaky, hundreds-of-network-calls part — the bit you don't want an agent babysitting.
+`--no-enrich` skips it: the engine still collects (one bulk Overture/OSM query),
+de-dupes, scores, and exports — just from the directory data, no per-site fetches.
+```bash
+python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich --out sonoma_quick
+```
+The scorers degrade **honestly** under `--no-enrich`: `web_design` still surfaces the
+**no-website / social-only** leads as Tier A (those need no site visit to identify),
+and marks businesses that *have* a site as "not audited" rather than guessing;
+`simply_tc` reports "TC status unknown". Re-run without the flag to grade the
+has-a-site leads. (Note: collection still needs network for the directory query;
+`--no-enrich` removes the *per-site* fetching, which is the fragile part.)
 
 ### Tool 2 — lead-tracker (local CRM)
 ```bash
