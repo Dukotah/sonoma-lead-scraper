@@ -35,7 +35,7 @@ _PROBES = [
 
 # Which sources each pipeline source actually needs.
 _SOURCE_NEEDS = {
-    "overture": ["overture_s3"],   # + duckdb httpfs extension (checked separately)
+    "overture": ["overture_s3"],   # + pyarrow/s3fs reader (checked separately)
     "osm": ["overpass"],
 }
 
@@ -52,12 +52,12 @@ def check_connectivity() -> dict:
         status[key] = ok
         results.append({"key": key, "label": label, "ok": ok, "detail": detail})
 
-    # Overture also needs duckdb's httpfs extension to read from S3.
-    duckdb_ok, duckdb_detail = _check_duckdb_httpfs()
-    results.append({"key": "duckdb_httpfs", "label": "Overture reader (duckdb httpfs)",
-                    "ok": duckdb_ok, "detail": duckdb_detail})
+    # Overture also needs the pyarrow+s3fs reader (no network beyond the S3 bucket).
+    reader_ok, reader_detail = _check_overture_reader()
+    results.append({"key": "overture_reader", "label": "Overture reader (pyarrow+s3fs)",
+                    "ok": reader_ok, "detail": reader_detail})
 
-    can_overture = status.get("overture_s3", False) and duckdb_ok
+    can_overture = status.get("overture_s3", False) and reader_ok
     can_osm = status.get("overpass", False)
 
     if can_overture and can_osm:
@@ -94,19 +94,14 @@ def _probe(fn) -> tuple[bool, str]:
         return False, f"{type(e).__name__}"
 
 
-def _check_duckdb_httpfs() -> tuple[bool, str]:
+def _check_overture_reader() -> tuple[bool, str]:
     try:
-        import duckdb
-    except ImportError:
-        return False, "duckdb not installed (pip install duckdb)"
-    try:
-        con = duckdb.connect()
-        con.execute("INSTALL httpfs; LOAD httpfs;")
+        import pyarrow.dataset  # noqa: F401
+        import s3fs  # noqa: F401
         return True, "ready"
+    except ImportError:
+        return False, "reader not installed (pip install pyarrow s3fs)"
     except Exception as e:
-        msg = str(e)
-        if "403" in msg or "download extension" in msg:
-            return False, "cannot download the httpfs extension on this network"
         return False, f"{type(e).__name__}"
 
 
@@ -118,15 +113,12 @@ _ERROR_HINTS = [
     ("All Overpass mirrors failed",
      "OpenStreetMap couldn't be reached (often blocked on corporate/VPN/cloud networks). "
      "Try the Overture source instead, or run from a home connection."),
-    ("httpfs",
-     "The Overture reader couldn't load on this network. Use the OpenStreetMap source "
-     "instead, or try a different connection."),
     ("Host not in allowlist",
      "This network is blocking the data sources. Try a normal home/office connection, "
      "or use Demo mode to preview the tool."),
-    ("duckdb",
-     "The Overture (bulk) source needs the 'duckdb' package. Install it, or use the "
-     "OpenStreetMap source which needs no extra packages."),
+    ("pyarrow + s3fs",
+     "The Overture (bulk) source needs the 'pyarrow' and 's3fs' packages. Install them "
+     "(pip install pyarrow s3fs), or use the OpenStreetMap source."),
     ("Failed to download",
      "A required component couldn't be downloaded on this network. Try another connection "
      "or use the OpenStreetMap source."),

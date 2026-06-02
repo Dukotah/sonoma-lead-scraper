@@ -1,0 +1,8 @@
+# Lead Scraper engine dependencies.
+requests>=2.31          # OSM/Overpass source + website enrichment/audit
+pyarrow>=14.0           # Overture parquet reader (sandbox-friendly, no httpfs)
+s3fs>=2023.12.0         # anonymous reads from the public Overture S3 bucket
+openpyxl>=3.1           # tiered .xlsx export
+# duckdb is NOT required: the Overture source reads parquet via pyarrow+s3fs so
+# it works inside restricted sandboxes where the duckdb httpfs extension (and
+# Overpass/Nominatim) are blocked.

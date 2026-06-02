@@ -3,6 +3,7 @@ flask>=3.0
 # Engine dependencies (also in leadgen/requirements.txt)
 requests>=2.31
 openpyxl>=3.1
-duckdb>=0.9            # only needed for the Overture (bulk) source
+pyarrow>=14.0         # Overture (bulk) source — parquet reader (no httpfs)
+s3fs>=2023.12.0       # Overture (bulk) source — public S3 access
 # Optional: native desktop window instead of a browser tab
 pywebview>=5.0

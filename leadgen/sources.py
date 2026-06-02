@@ -2,8 +2,14 @@
 Data sources — collect the raw business universe for a bbox.
 
 Two free, no-key sources, both already proven in this repo:
-  - overture_collect(): Overture Maps Places via DuckDuckDB+S3 (national, CC-BY)
+  - overture_collect(): Overture Maps Places via pyarrow+s3fs (national, CC-BY)
   - osm_collect():      OpenStreetMap via Overpass (live, ODbL)
+
+Sandbox note: overture_collect talks ONLY to the public Overture S3 bucket
+(overturemaps-us-west-2), which is reachable from the restricted agent sandbox,
+and uses bbox predicate pushdown so it streams just the relevant byte ranges
+instead of the multi-GB global files. osm_collect needs Overpass, which the
+sandbox proxy blocks — use Overture in-sandbox, OSM on an open connection.
 
 Both return a list of normalized lead dicts with the same shape so the rest of
 the pipeline is source-agnostic:
@@ -20,73 +26,100 @@ from .audit import UA
 
 # ───────────────────────── Overture (bulk, national) ─────────────────────────
 FALLBACK_RELEASE = "2026-05-20.0"
+OVERTURE_BUCKET = "overturemaps-us-west-2"
 
 
-def _overture_release(con) -> str:
+def _overture_fs():
+    """Anonymous read-only handle to the public Overture S3 bucket."""
+    import s3fs
+    return s3fs.S3FileSystem(anon=True, client_kwargs={"region_name": "us-west-2"})
+
+
+def _overture_release(fs=None) -> str:
+    """Newest release folder under the bucket (e.g. '2026-05-20.0'); FALLBACK on error."""
     try:
-        pat = ("s3://overturemaps-us-west-2/release/202[0-9]-*"
-               "/theme=places/type=place/part-00000-*")
-        rows = con.execute(
-            "SELECT DISTINCT regexp_extract(file, 'release/([^/]+)/', 1) AS rel "
-            f"FROM glob('{pat}') WHERE rel <> '' ORDER BY rel DESC LIMIT 1"
-        ).fetchall()
-        if rows and rows[0][0]:
-            return rows[0][0]
+        fs = fs or _overture_fs()
+        rels = sorted(p.rsplit("/", 1)[-1] for p in fs.ls(f"{OVERTURE_BUCKET}/release"))
+        rels = [r for r in rels if r[:1].isdigit()]
+        if rels:
+            return rels[-1]
     except Exception:
         pass
     return FALLBACK_RELEASE
 
 
+def _first(v):
+    """First element of an Overture list-valued field (websites/phones/emails), or None."""
+    return v[0] if isinstance(v, list) and v else None
+
+
 def overture_collect(bbox, categories: list[str] | None = None,
                      limit: int | None = None, log=print) -> list[dict]:
-    """Stream Overture Places for a bbox, optionally filtered to category substrings."""
+    """Stream Overture Places for a bbox, optionally filtered to category substrings.
+
+    Backend: pyarrow.dataset over s3fs. Reads directly from the public Overture
+    S3 bucket using bbox predicate pushdown (range GETs), so it runs inside the
+    restricted agent sandbox with no DuckDB/httpfs and no full-file downloads.
+    """
     try:
-        import duckdb
-    except ImportError:
-        raise RuntimeError("overture_collect needs duckdb: pip install duckdb")
+        import pyarrow.dataset as ds
+        import pyarrow.compute as pc
+    except ImportError as e:
+        raise RuntimeError(
+            "overture_collect needs pyarrow + s3fs: pip install pyarrow s3fs"
+        ) from e
 
     south, west, north, east = bbox
-    con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2';")
-    release = _overture_release(con)
-    log(f"  Overture release {release}; streaming bbox…")
-    s3 = (f"s3://overturemaps-us-west-2/release/{release}"
-          f"/theme=places/type=place/*")
+    fs = _overture_fs()
+    release = _overture_release(fs)
+    log(f"  Overture release {release}; streaming bbox via S3…")
+    base = f"{OVERTURE_BUCKET}/release/{release}/theme=places/type=place"
+    dataset = ds.dataset(base, filesystem=fs, format="parquet")
 
-    cat_clause = ""
+    # bbox pushdown — points have xmin==xmax, ymin==ymax, so this keeps everything
+    # inside the requested box and lets parquet skip non-overlapping row groups.
+    flt = ((pc.field("bbox", "xmin") >= west) & (pc.field("bbox", "xmax") <= east)
+           & (pc.field("bbox", "ymin") >= south) & (pc.field("bbox", "ymax") <= north))
     if categories:
-        ors = " OR ".join("lower(categories.primary) LIKE ?" for _ in categories)
-        cat_clause = f"AND ({ors})"
-    params = [f"%{c.lower()}%" for c in (categories or [])]
+        cat = pc.field("categories", "primary")
+        cat_or = None
+        for c in categories:
+            m = pc.match_substring(cat, c, ignore_case=True)
+            cat_or = m if cat_or is None else (cat_or | m)
+        flt = flt & cat_or
 
-    sql = f"""
-      SELECT names.primary AS name,
-             categories.primary AS category,
-             CASE WHEN length(websites)>0 THEN websites[1] END AS website,
-             CASE WHEN length(phones)>0   THEN phones[1]   END AS phone,
-             CASE WHEN length(emails)>0   THEN emails[1]   END AS email,
-             addresses[1].freeform AS address,
-             addresses[1].locality AS city,
-             addresses[1].region   AS state,
-             addresses[1].postcode AS zip,
-             brand.names.primary AS brand,
-             bbox.xmin AS lon, bbox.ymin AS lat
-      FROM read_parquet('{s3}', hive_partitioning=1)
-      WHERE bbox.xmin BETWEEN {west} AND {east}
-        AND bbox.ymin BETWEEN {south} AND {north}
-        AND names.primary IS NOT NULL
-        {cat_clause}
-      {f'LIMIT {int(limit)}' if limit else ''}
-    """
-    cols = ["name", "category", "website", "phone", "email", "address",
-            "city", "state", "zip", "brand", "lon", "lat"]
-    rows = con.execute(sql, params).fetchall()
+    cols = ["id", "names", "categories", "phones", "websites", "emails",
+            "addresses", "brand", "bbox"]
+    rows = dataset.to_table(columns=cols, filter=flt).to_pylist()
+    if limit:
+        rows = rows[:int(limit)]
+
     out = []
     for r in rows:
-        rec = dict(zip(cols, r))
-        rec["source"] = "overture"
-        rec["source_url"] = ""
-        out.append(rec)
+        name = (r.get("names") or {}).get("primary")
+        if not name:
+            continue
+        addrs = r.get("addresses") or []
+        addr = addrs[0] if addrs else {}
+        brand = ((r.get("brand") or {}).get("names") or {}).get("primary")
+        bb = r.get("bbox") or {}
+        out.append({
+            "id": r.get("id"),
+            "name": name,
+            "category": (r.get("categories") or {}).get("primary"),
+            "website": _first(r.get("websites")),
+            "phone": _first(r.get("phones")),
+            "email": _first(r.get("emails")),
+            "address": addr.get("freeform"),
+            "city": addr.get("locality"),
+            "state": addr.get("region"),
+            "zip": addr.get("postcode"),
+            "brand": brand,
+            "lon": bb.get("xmin"),
+            "lat": bb.get("ymin"),
+            "source": "overture",
+            "source_url": "",
+        })
     log(f"  Overture: {len(out)} businesses")
     return out
 

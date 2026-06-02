@@ -22,6 +22,13 @@ python -m leadgen --vertical web_design --market sonoma_county_ca --no-enrich
 
 Outputs a CRM-ready `<stem>_crm.csv` and a color-tiered `<stem>.xlsx`.
 
+> **Run it from an agent sandbox (no local machine, no open internet).** The
+> Overture source reads parquet straight from public S3 via `pyarrow` + `s3fs`
+> (no DuckDB/`httpfs`), so an agent can scrape live business data from inside a
+> restricted sandbox like Claude Code on the web. Use `--sources overture
+> --no-enrich` with a named `--market`. What's reachable, what isn't, and why:
+> [`docs/SANDBOX.md`](docs/SANDBOX.md).
+
 ### Point-and-click GUI — `gui/`
 
 No command line needed: pick a vertical + market, paste competitor pages to skip,
