@@ -88,28 +88,7 @@ def audit_website(url: str) -> dict:
         out["https"] = r.url.startswith("https://")
         out["size_kb"] = round(len(r.content) / 1024, 1)
         out["html"] = r.text  # kept so verticals can fingerprint without re-fetching
-        html = r.text[:50000].lower()
-        if 'name="viewport"' in html:
-            out["mobile_viewport"] = True
-        tm = re.search(r"<title>([^<]+)</title>", r.text, re.IGNORECASE)
-        if tm:
-            out["title"] = tm.group(1).strip()[:100]
-        for sig, b in [("wix.com", "Wix"), ("squarespace", "Squarespace"),
-                       ("weebly", "Weebly"), ("godaddy", "GoDaddy Sites"),
-                       ("wordpress", "WordPress"), ("shopify", "Shopify"),
-                       ("webflow", "Webflow"), ("duda", "Duda"),
-                       ("site123", "Site123"), ("jimdo", "Jimdo")]:
-            if sig in html:
-                out["builder"] = b
-                break
-        if ms > 4000:
-            out["audit_notes"].append(f"Slow load ({ms}ms)")
-        if not out["mobile_viewport"]:
-            out["audit_notes"].append("No mobile viewport")
-        if not out["https"]:
-            out["audit_notes"].append("No HTTPS")
-        if out["builder"] in ("Wix", "Weebly", "GoDaddy Sites", "Site123", "Jimdo"):
-            out["audit_notes"].append(f"DIY-builder ({out['builder']})")
+        _audit_from_html(out, r.text)
     except requests.exceptions.SSLError:
         out["audit_notes"].append("SSL / broken cert")
     except requests.exceptions.Timeout:
@@ -117,6 +96,50 @@ def audit_website(url: str) -> dict:
     except Exception as e:
         out["audit_notes"].append(f"Unreachable: {type(e).__name__}")
     return out
+
+
+# DIY site builders that signal a low-investment site a designer could rebuild.
+DIY_BUILDERS = ("Wix", "Weebly", "GoDaddy Sites", "Site123", "Jimdo")
+
+
+def _audit_from_html(out: dict, html_text: str) -> dict:
+    """Derive viewport / title / builder signals + notes from page HTML into `out`.
+    Shared by the live fetch (audit_website) and the offline demo path (audit_html),
+    so both report identical signals. Assumes `out` already has https/load_ms set."""
+    html = (html_text or "")[:50000].lower()
+    if 'name="viewport"' in html:
+        out["mobile_viewport"] = True
+    tm = re.search(r"<title>([^<]+)</title>", html_text or "", re.IGNORECASE)
+    if tm:
+        out["title"] = tm.group(1).strip()[:100]
+    for sig, b in [("wix.com", "Wix"), ("squarespace", "Squarespace"),
+                   ("weebly", "Weebly"), ("godaddy", "GoDaddy Sites"),
+                   ("wordpress", "WordPress"), ("shopify", "Shopify"),
+                   ("webflow", "Webflow"), ("duda", "Duda"),
+                   ("site123", "Site123"), ("jimdo", "Jimdo")]:
+        if sig in html:
+            out["builder"] = b
+            break
+    if (out.get("load_ms") or 0) > 4000:
+        out["audit_notes"].append(f"Slow load ({out['load_ms']}ms)")
+    if not out["mobile_viewport"]:
+        out["audit_notes"].append("No mobile viewport")
+    if not out["https"]:
+        out["audit_notes"].append("No HTTPS")
+    if out["builder"] in DIY_BUILDERS:
+        out["audit_notes"].append(f"DIY-builder ({out['builder']})")
+    return out
+
+
+def audit_html(url: str, html: str, load_ms: int = 800) -> dict:
+    """Audit a page from already-fetched HTML — no network. Used by demo mode and
+    tests so the web-design vertical can grade fixture pages exactly as it would a
+    live fetch. `https` is inferred from the URL scheme; the page is assumed reachable."""
+    out = {"reachable": True, "https": (url or "").startswith("https://"),
+           "load_ms": load_ms, "mobile_viewport": False, "builder": "", "title": "",
+           "size_kb": round(len(html or "") / 1024, 1), "html": html or "",
+           "audit_notes": []}
+    return _audit_from_html(out, html or "")
 
 
 def _name_tokens(name: str) -> list[str]:

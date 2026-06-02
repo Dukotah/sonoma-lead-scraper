@@ -32,6 +32,28 @@ def test_demo_mode_runs_offline_and_tiers():
     assert harbor["decision_maker"] == "Susan Park"
 
 
+def test_web_design_demo_runs_offline_and_audits():
+    # web_design must also demo fully offline: its sites are graded from bundled
+    # fixture HTML, never the network, and must produce a realistic tier spread.
+    v = get_vertical("web_design")
+    leads = run_pipeline(v, market="(demo)", demo=True, enrich=True, log=lambda *_: None)
+    assert len(leads) == 5
+    assert all("tier" in r and "opener" in r for r in leads)
+    by = {r["name"]: r for r in leads}
+    # no-website business is the strongest lead
+    assert by["Redwood Plumbing"]["tier"] == "A" and "NO WEBSITE" in by["Redwood Plumbing"]["why"]
+    # social-only presence is also Tier A
+    assert by["Bella Hair Salon"]["tier"] == "A"
+    # the http:// site was audited offline -> no HTTPS / not mobile-friendly
+    joe = by["Joe's Auto Repair"]
+    assert joe["audit"]["reachable"] and not joe["audit"]["https"]
+    assert "no HTTPS" in joe["why"]
+    # the Wix site's builder was fingerprinted from fixture HTML
+    assert by["Sonoma Family Law"]["audit"]["builder"] == "Wix"
+    # the clean site is correctly a low-priority lead (don't over-flag)
+    assert by["Green Valley Cafe"]["tier"] == "C"
+
+
 def test_crm_dedupe_removes_existing():
     csv_text = "Company name,Phone\nHarbor Real Estate,555\n\"Coastal Realty Group, LLC\",555\n"
     names = load_crm_names(csv_text, is_text=True)

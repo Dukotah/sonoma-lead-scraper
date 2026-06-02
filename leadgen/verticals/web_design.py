@@ -8,14 +8,21 @@ generalizes: same pipeline, totally different scoring.
 from __future__ import annotations
 
 from .. import register, Vertical
-from ..audit import audit_website, is_weak_url
+from ..audit import audit_website, audit_html, is_weak_url, DIY_BUILDERS
 
-CONFIG = {"diy_builders": ("Wix", "Weebly", "GoDaddy Sites", "Site123", "Jimdo")}
+CONFIG = {"diy_builders": DIY_BUILDERS}
 
 
 def _enrich(rec: dict, ctx: dict) -> dict:
     site = rec.get("website") or ""
-    if site and not is_weak_url(site)[0]:
+    if not site or is_weak_url(site)[0]:
+        return rec                       # no real site to audit — scoring handles these
+    # Demo mode: grade bundled fixture HTML offline, exactly as a live fetch would.
+    demo_html = ctx.get("demo_html")
+    if demo_html is not None:
+        html = demo_html(site)
+        rec["audit"] = audit_html(site, html) if html else None
+    else:
         rec["audit"] = audit_website(site)
     return rec
 
@@ -57,12 +64,15 @@ def _score(rec: dict) -> tuple[int, str, str]:
 
 def _opener(rec: dict) -> str:
     site = (rec.get("website") or "").lower()
+    audit = rec.get("audit") or {}
     if not site:
         return f"No website — pitch a 1-page site ranking for '{rec.get('category','')} {rec.get('city','')}'."
     if "facebook" in site or "instagram" in site:
         return "Social-only — pitch a real site that ranks on Google."
     if site.startswith("http://"):
         return "HTTP only — Chrome flags it 'Not secure'. Quick rebuild + SSL."
+    if audit.get("builder") in CONFIG["diy_builders"]:
+        return f"DIY {audit['builder']} site — pitch a custom rebuild that loads faster and ranks better."
     return "Has a site — verify quality before pitching."
 
 

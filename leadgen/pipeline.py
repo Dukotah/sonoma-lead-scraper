@@ -101,7 +101,7 @@ def run_pipeline(vertical: Vertical, market: str, *,
     leads: list[dict] = []
     if demo:
         from .demo import demo_records
-        leads = demo_records()
+        leads = demo_records(vertical.key)
         log(f"DEMO MODE — using {len(leads)} bundled sample businesses (no network).")
     else:
         bbox, label = resolve_market(market)
@@ -142,8 +142,8 @@ def run_pipeline(vertical: Vertical, market: str, *,
     # 3. ENRICH (per-business website visit) — parallel, capped
     if enrich and vertical.enrich_fn and demo:
         # Offline enrichment: feed bundled fixture HTML through the same hooks.
-        from .demo import demo_html_for
-        ctx = {"config": cfg, "demo_html": demo_html_for}
+        from .demo import demo_html_lookup
+        ctx = {"config": cfg, "demo_html": demo_html_lookup(vertical.key)}
         log(f"Enriching {len(leads)} sample businesses from bundled pages…")
         for r in leads:
             try:
