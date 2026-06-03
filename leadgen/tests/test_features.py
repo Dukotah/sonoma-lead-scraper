@@ -54,6 +54,34 @@ def test_web_design_demo_runs_offline_and_audits():
     assert by["Green Valley Cafe"]["tier"] == "C"
 
 
+def test_agent_contract_schema_and_formats():
+    # The agent-to-agent contract: --schema self-describes, and the stdout formats
+    # are machine-parseable. Exercised offline via demo mode.
+    import io, json
+    from contextlib import redirect_stdout
+    from leadgen.__main__ import main
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert main(["--schema"]) == 0
+    schema = json.loads(buf.getvalue())          # must be valid JSON
+    assert "tier" in schema["fields"] and "opener" in schema["fields"]
+    assert schema["logs_on"] == "stderr"
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert main(["--vertical", "web_design", "--demo", "--format", "jsonl"]) == 0
+    recs = [json.loads(l) for l in buf.getvalue().splitlines() if l.strip()]
+    assert len(recs) == 5                         # one JSON object per line, all parse
+    assert all({"name", "tier", "score", "why", "opener"} <= set(r) for r in recs)
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        main(["--vertical", "web_design", "--demo", "--format", "csv"])
+    rows = [l for l in buf.getvalue().splitlines() if l.strip()]
+    assert rows[0].startswith("Tier,Score,") and len(rows) == 6   # header + 5 records
+
+
 def test_crm_dedupe_removes_existing():
     csv_text = "Company name,Phone\nHarbor Real Estate,555\n\"Coastal Realty Group, LLC\",555\n"
     names = load_crm_names(csv_text, is_text=True)

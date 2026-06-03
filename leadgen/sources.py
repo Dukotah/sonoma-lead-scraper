@@ -64,11 +64,13 @@ def _overture_norm(row: dict) -> dict:
         "website": first(row.get("websites")),
         "phone": first(row.get("phones")),
         "email": first(row.get("emails")),
+        "socials": list(row.get("socials") or []),
         "address": a.get("freeform"),
         "city": a.get("locality"),
         "state": a.get("region"),
         "zip": a.get("postcode"),
         "brand": bname,
+        "confidence": row.get("confidence"),
         "lon": bb.get("xmin"),
         "lat": bb.get("ymin"),
         "source": "overture",
@@ -112,8 +114,8 @@ def _overture_pyarrow(bbox, categories, limit, log) -> list[dict]:
     dset = pads.dataset(files, filesystem=s3, format="parquet")
     flt = ((pads.field("bbox", "xmin") >= west) & (pads.field("bbox", "xmin") <= east) &
            (pads.field("bbox", "ymin") >= south) & (pads.field("bbox", "ymin") <= north))
-    cols = ["names", "categories", "websites", "phones", "emails",
-            "addresses", "brand", "bbox"]
+    cols = ["names", "categories", "websites", "phones", "emails", "socials",
+            "addresses", "brand", "confidence", "bbox"]
     out = []
     for row in dset.to_table(filter=flt, columns=cols).to_pylist():
         if not _cat_match((row.get("categories") or {}).get("primary"), categories):
@@ -165,11 +167,13 @@ def overture_collect(bbox, categories: list[str] | None = None,
              CASE WHEN length(websites)>0 THEN websites[1] END AS website,
              CASE WHEN length(phones)>0   THEN phones[1]   END AS phone,
              CASE WHEN length(emails)>0   THEN emails[1]   END AS email,
+             socials AS socials,
              addresses[1].freeform AS address,
              addresses[1].locality AS city,
              addresses[1].region   AS state,
              addresses[1].postcode AS zip,
              brand.names.primary AS brand,
+             confidence AS confidence,
              bbox.xmin AS lon, bbox.ymin AS lat
       FROM read_parquet('{s3}', hive_partitioning=1)
       WHERE bbox.xmin BETWEEN {west} AND {east}
@@ -178,8 +182,8 @@ def overture_collect(bbox, categories: list[str] | None = None,
         {cat_clause}
       {f'LIMIT {int(limit)}' if limit else ''}
     """
-    cols = ["name", "category", "website", "phone", "email", "address",
-            "city", "state", "zip", "brand", "lon", "lat"]
+    cols = ["name", "category", "website", "phone", "email", "socials", "address",
+            "city", "state", "zip", "brand", "confidence", "lon", "lat"]
     rows = con.execute(sql, params).fetchall()
     out = []
     for r in rows:
