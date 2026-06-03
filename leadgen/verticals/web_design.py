@@ -37,11 +37,15 @@ def _score(rec: dict) -> tuple[int, str, str]:
     elif weak:
         score += 40; reasons.append(f"non-site link ({why})"); tier = "A"
     elif not audit:
-        # Has a real-looking site but enrichment was skipped — we have NOT inspected
-        # it, so don't fabricate an "unreachable" verdict. Honest, low-confidence
-        # lead: the no-website/social-only Tier-A leads above need no enrichment, but
-        # judging a live site does. Re-run without --no-enrich to grade these.
-        tier = "C"; reasons.append("has a site — not audited (run enrichment to grade)")
+        # Enrichment skipped (--no-enrich). We can't judge a live site without fetching
+        # it — BUT one defect is provable from the URL string alone, no network: an
+        # http:// URL has no SSL, which Chrome flags as "Not secure" in the address bar.
+        # That's a real, sellable problem, so surface it as a Tier-B lead now. https
+        # sites stay low-confidence until a full enrichment run can inspect them.
+        if site.lower().startswith("http://"):
+            score += 18; reasons.append("no HTTPS (http:// — Chrome flags 'Not secure')"); tier = "B"
+        else:
+            tier = "C"; reasons.append("has a site — not audited (run enrichment to grade)")
     else:
         tier = "C"
         if not audit.get("reachable"):

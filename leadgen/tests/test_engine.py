@@ -112,6 +112,19 @@ def test_overture_norm_and_category_filter():
     assert empty["name"] is None and empty["category"] == "" and empty["brand"] is None
 
 
+def test_web_design_scores_http_only_without_enrichment():
+    # With --no-enrich (audit is None) the scorer must still flag an http:// site as a
+    # "no HTTPS" Tier-B lead straight from the URL — no fetch — while an https site we
+    # haven't inspected stays low-confidence Tier C, and no-website stays Tier A.
+    from leadgen.verticals.web_design import _score
+    _, tier_a, why_a = _score({"website": "", "phone": "707-555-0000"})
+    _, tier_b, why_b = _score({"website": "http://oldwinery.com"})
+    _, tier_c, why_c = _score({"website": "https://modernwinery.com"})
+    assert tier_a == "A" and "NO WEBSITE" in why_a
+    assert tier_b == "B" and "no HTTPS" in why_b
+    assert tier_c == "C" and "not audited" in why_c
+
+
 def _run_all():
     fns = [g for n, g in sorted(globals().items()) if n.startswith("test_")]
     failed = 0
