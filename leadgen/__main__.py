@@ -74,6 +74,9 @@ def main(argv=None) -> int:
     ap.add_argument("--enrich-cap", type=int, default=150,
                     help="enrich only the top-N businesses (cost control)")
     ap.add_argument("--no-enrich", action="store_true", help="skip per-site enrichment")
+    ap.add_argument("--keep-chains", action="store_true",
+                    help="keep branded records (use for sectors like wineries where the "
+                         "Overture brand is the business's own label, not a franchise)")
     ap.add_argument("--demo", action="store_true",
                     help="run fully offline on bundled sample data (no network) — for testing / agents")
     ap.add_argument("--format", choices=["json", "jsonl", "csv"],
@@ -121,7 +124,8 @@ def main(argv=None) -> int:
         sources=tuple(args.sources), limit=args.limit,
         enrich=not args.no_enrich, enrich_cap=args.enrich_cap,
         out_stem=out_stem, demo=args.demo,
-        overture_categories=args.category, log=log,
+        overture_categories=args.category,
+        keep_chains=(True if args.keep_chains else None), log=log,
     )
 
     if fmt == "json":

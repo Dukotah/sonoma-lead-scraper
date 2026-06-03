@@ -76,6 +76,7 @@ def run_pipeline(vertical: Vertical, market: str, *,
                  out_stem: str | None = None, config_override: dict | None = None,
                  exclude_names: set | None = None, demo: bool = False,
                  overture_categories: list | None = None,
+                 keep_chains: bool | None = None,
                  log=print) -> list[dict]:
     """Run the full pipeline for one vertical in one market.
 
@@ -90,6 +91,8 @@ def run_pipeline(vertical: Vertical, market: str, *,
                    — see load_crm_names(). Matches are removed, not just flagged.
     overture_categories: category substrings to filter Overture by, overriding the
                      vertical's defaults (e.g. ["plumbing"] for a plumbers-only run).
+    keep_chains: override the vertical's keep_chains for this run (True keeps branded
+                     records — needed for wineries, whose "brand" is their own label).
     demo: if True, use bundled offline sample data + fixture enrichment (no network).
     Returns the scored, sorted list of lead dicts. Output file paths, when written,
     are attached as run_pipeline.last_outputs = (csv_path, xlsx_path).
@@ -131,8 +134,11 @@ def run_pipeline(vertical: Vertical, market: str, *,
         leads = [r for r in leads if norm(r.get("name", "")) not in exclude_names]
         log(f"  removed {before - len(leads)} already in your CRM ({len(exclude_names)} names)")
 
-    # 1b. chain handling — verticals that don't keep chains drop branded records
-    if not vertical.keep_chains:
+    # 1b. chain handling — verticals that don't keep chains drop branded records.
+    # keep_chains override matters for sectors (e.g. wineries) where Overture's "brand"
+    # is the business's OWN label, not a franchise, so dropping it would lose real leads.
+    keep = vertical.keep_chains if keep_chains is None else keep_chains
+    if not keep:
         before = len(leads)
         leads = [r for r in leads if not (r.get("brand"))]
         log(f"  dropped {before - len(leads)} chain/branded records")
