@@ -33,8 +33,21 @@ app = Flask(__name__)
 
 # In-memory job store: job_id -> {log, done, error, stats, leads, files}
 JOBS: dict[str, dict] = {}
+MAX_JOBS = 50  # keep the store bounded so a long-lived process doesn't leak
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_output")
 os.makedirs(OUT_DIR, exist_ok=True)
+
+
+def _prune_jobs():
+    """Drop the oldest finished jobs once we exceed MAX_JOBS. job_ids are
+    millisecond timestamps, so sorting by key is chronological."""
+    while len(JOBS) > MAX_JOBS:
+        for jid in sorted(JOBS):
+            if JOBS[jid].get("done"):
+                JOBS.pop(jid, None)
+                break
+        else:
+            break  # nothing finished yet — leave running jobs alone
 
 
 # ─────────────────────── bundled lead database ───────────────────────────────
@@ -192,6 +205,7 @@ def start_run():
     jid = str(int(time.time() * 1000))
     JOBS[jid] = {"log": [], "done": False, "error": None, "notice": None,
                  "stats": None, "leads": None, "files": None, "columns": None}
+    _prune_jobs()
     threading.Thread(target=run_job, args=(jid, params), daemon=True).start()
     return jsonify({"job_id": jid})
 

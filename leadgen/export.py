@@ -7,13 +7,27 @@ from __future__ import annotations
 
 import csv
 
+# Leading characters Excel/Sheets treat as the start of a formula. A lead name or
+# scraped field beginning with one of these would execute on open (CSV injection),
+# so we neutralize it with a leading apostrophe. Our entire deliverable is "open
+# this in Excel," and several fields carry third-party / scraped text.
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def sanitize_cell(value):
+    """Neutralize spreadsheet formula injection. Non-strings pass through unchanged
+    (scores, counts), so numeric cells stay numeric."""
+    if isinstance(value, str) and value and value[0] in _FORMULA_TRIGGERS:
+        return "'" + value
+    return value
+
 
 def write_csv(leads: list[dict], columns: list[tuple[str, str]], path: str) -> str:
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow([h for h, _ in columns])
         for r in leads:
-            w.writerow([r.get(k, "") for _, k in columns])
+            w.writerow([sanitize_cell(r.get(k, "")) for _, k in columns])
     return path
 
 
@@ -41,7 +55,7 @@ def write_xlsx(leads: list[dict], columns: list[tuple[str, str]], path: str,
     tier_col = next((i for i, (_, k) in enumerate(columns, 1) if k == "tier"), None)
     for ri, r in enumerate(leads, 2):
         for i, (_, k) in enumerate(columns, 1):
-            c = s.cell(row=ri, column=i, value=r.get(k))
+            c = s.cell(row=ri, column=i, value=sanitize_cell(r.get(k)))
             c.font = BODY; c.alignment = WRAP
         if tier_col and r.get("tier") in TIER_FILL:
             s.cell(row=ri, column=tier_col).fill = TIER_FILL[r["tier"]]

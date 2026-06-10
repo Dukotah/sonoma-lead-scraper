@@ -73,12 +73,21 @@ def build_suppression_set(seeds: dict[str, str], log=print) -> dict[str, str]:
     served by a competitor — the scorer sinks them (kept, not deleted, so you can
     re-approach when a contract lapses)."""
     suppressed: dict[str, str] = {}
+    empty = 0
     for label, url in (seeds or {}).items():
         names = scrape_competitor_clients(url)
         for raw in names:
             key = norm(raw)
             if key:
                 suppressed.setdefault(key, label)
-        log(f"  suppression: {label} → {len(names)} client names scraped")
+        if names:
+            log(f"  suppression: {label} → {len(names)} client names scraped")
+        else:
+            empty += 1
+            log(f"  suppression: {label} → 0 names (page unreachable, blank, or "
+                f"JavaScript-rendered — VERIFY this URL in a browser)")
+    if empty:
+        log(f"  WARNING: {empty} of {len(seeds)} competitor page(s) yielded no "
+            f"names — those competitors' clients are NOT being suppressed.")
     log(f"  suppression set: {len(suppressed)} unique competitor clients")
     return suppressed

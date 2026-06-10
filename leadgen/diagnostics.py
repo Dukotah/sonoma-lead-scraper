@@ -115,6 +115,10 @@ _ERROR_HINTS = [
     ("could not resolve market",
      "That place name wasn't found. Try adding the state, e.g. \"Santa Rosa, California\", "
      "or pick a saved market from the list."),
+    ("very large area",
+     "That place covers a very large area — searching it would be extremely slow. "
+     "Narrow it to a city or county, e.g. \"Santa Rosa, California\" instead of a "
+     "whole state."),
     ("All Overpass mirrors failed",
      "OpenStreetMap couldn't be reached (often blocked on corporate/VPN/cloud networks). "
      "Try the Overture source instead, or run from a home connection."),

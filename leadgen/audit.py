@@ -5,7 +5,9 @@ retry, builder/SSL/mobile checks) so every vertical fetches the same safe way.
 """
 from __future__ import annotations
 
+import ipaddress
 import re
+import socket
 import time
 from typing import Optional
 from urllib.parse import urlparse, unquote
@@ -14,6 +16,35 @@ import requests
 
 UA = "LeadGen/1.0 (+contact: dukotah@gmail.com)"
 AUDIT_TIMEOUT = 6
+# Cap any single response we read into memory. Enrichment fans out 8 threads ×
+# capped pages; an unbounded page could balloon RAM, and nothing past this helps
+# our fingerprints anyway.
+MAX_RESPONSE_BYTES = 2_000_000
+
+
+def is_safe_url(url: str) -> bool:
+    """SSRF guard: reject URLs whose host resolves to a private, loopback,
+    link-local, or otherwise non-public address. We fetch `website` values that
+    come from third-party data (Overture/OSM) and user-pasted competitor URLs, so
+    a hostile or careless entry could otherwise point us at localhost or a cloud
+    metadata endpoint (169.254.169.254). Unknown/unresolvable hosts return False."""
+    host = hostname(url)
+    if not host:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return False
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            return False
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+            return False
+    return True
 
 # Domains that mean "no real website" — a social/listing page, not an owned site.
 WEAK_DOMAINS = (
@@ -56,14 +87,26 @@ def is_weak_url(url: str) -> tuple[bool, str]:
 
 
 def fetch(url: str, timeout: int = AUDIT_TIMEOUT) -> Optional["requests.Response"]:
-    """GET a URL politely; return the Response or None on any failure."""
+    """GET a URL politely; return the Response or None on any failure.
+    Refuses non-public hosts (SSRF guard) and caps the body we read."""
     if not url:
         return None
     if not url.startswith("http"):
         url = "http://" + url
+    if not is_safe_url(url):
+        return None
     try:
-        return requests.get(url, headers={"User-Agent": UA},
-                            timeout=timeout, allow_redirects=True)
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=timeout,
+                         allow_redirects=True, stream=True)
+        # Redirects can hop to an internal host the initial check never saw.
+        if not is_safe_url(r.url):
+            r.close()
+            return None
+        # Read at most MAX_RESPONSE_BYTES, then close the connection.
+        content = r.raw.read(MAX_RESPONSE_BYTES + 1, decode_content=True)
+        r._content = content[:MAX_RESPONSE_BYTES]
+        r.close()
+        return r
     except Exception:
         return None
 
@@ -78,10 +121,20 @@ def audit_website(url: str) -> dict:
     if not url.startswith("http"):
         url = "http://" + url
     out["https"] = url.startswith("https://")
+    if not is_safe_url(url):
+        out["audit_notes"].append("Unreachable: blocked non-public host")
+        return out
     try:
         t0 = time.time()
-        r = requests.get(url, headers={"User-Agent": UA},
-                         timeout=AUDIT_TIMEOUT, allow_redirects=True)
+        r = requests.get(url, headers={"User-Agent": UA}, timeout=AUDIT_TIMEOUT,
+                         allow_redirects=True, stream=True)
+        if not is_safe_url(r.url):
+            out["audit_notes"].append("Unreachable: redirected to non-public host")
+            r.close()
+            return out
+        body = r.raw.read(MAX_RESPONSE_BYTES + 1, decode_content=True)[:MAX_RESPONSE_BYTES]
+        r._content = body
+        r.close()
         ms = int((time.time() - t0) * 1000)
         out["load_ms"] = ms
         out["reachable"] = r.status_code < 400

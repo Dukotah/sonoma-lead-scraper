@@ -52,22 +52,45 @@ def load_crm_names(path_or_text: str, *, is_text: bool = False) -> set[str]:
 
 
 def _dedupe(leads: list[dict]) -> list[dict]:
-    """Collapse same-name duplicates (across sources) within one market."""
-    seen: dict[str, dict] = {}
+    """Collapse duplicates within one market.
+
+    Two records merge only when their normalized names match AND they're in the
+    same city (or at least one city is blank). This keeps genuinely distinct
+    offices that share a name — common once chains are kept — from collapsing into
+    one, while still merging the same firm seen across sources or with a missing
+    city. The surviving record back-fills any blank contact fields from its dupes.
+    """
+    groups: list[dict] = []
+    index: dict[str, list[dict]] = {}
+
+    def _same_place(a: dict, b: dict) -> bool:
+        ca = (a.get("city") or "").strip().lower()
+        cb = (b.get("city") or "").strip().lower()
+        return not ca or not cb or ca == cb
+
     for r in leads:
         key = norm(r.get("name", ""))
         if not key:
             continue
-        if key in seen:
-            # prefer the record that already has a website / more fields
-            cur = seen[key]
-            if not cur.get("website") and r.get("website"):
-                cur["website"] = r["website"]
-            if not cur.get("phone") and r.get("phone"):
-                cur["phone"] = r["phone"]
+        match = next((g for g in index.get(key, []) if _same_place(g, r)), None)
+        if match is None:
+            groups.append(r)
+            index.setdefault(key, []).append(r)
         else:
-            seen[key] = r
-    return list(seen.values())
+            for fld in ("website", "phone", "email", "address", "city", "lat", "lon"):
+                if not match.get(fld) and r.get(fld):
+                    match[fld] = r[fld]
+    return groups
+
+
+def _enrich_priority(r: dict) -> tuple:
+    """Cheap pre-enrichment rank so a capped budget goes to leads we can learn
+    from. A real (non-social) website is the big one — without it enrichment is a
+    no-op; phone/email are minor tie-breakers."""
+    from .audit import is_weak_url
+    site = r.get("website") or ""
+    has_site = bool(site) and not is_weak_url(site)[0]
+    return (has_site, bool(site), bool(r.get("phone")), bool(r.get("email")))
 
 
 def run_pipeline(vertical: Vertical, market: str, *,
@@ -151,7 +174,14 @@ def run_pipeline(vertical: Vertical, market: str, *,
             except Exception as e:
                 r["enrich_error"] = str(e)
     elif enrich and vertical.enrich_fn:
-        targets = leads if enrich_cap is None else leads[:enrich_cap]
+        # Spend the (capped) enrich budget on the most promising leads, not on
+        # arbitrary collection order: a record with no website can't be enriched
+        # at all, so prioritize ones we can actually learn something from.
+        if enrich_cap is None:
+            targets = leads
+        else:
+            ranked = sorted(leads, key=_enrich_priority, reverse=True)
+            targets = ranked[:enrich_cap]
         log(f"Enriching {len(targets)} businesses (parallel)…")
         ctx = {"config": cfg}
         with ThreadPoolExecutor(max_workers=8) as ex:
@@ -162,6 +192,7 @@ def run_pipeline(vertical: Vertical, market: str, *,
                     f.result()
                 except Exception as e:
                     futs[f]["enrich_error"] = str(e)
+                    futs[f].setdefault("enrich_note", f"enrich failed: {e}")
                 done += 1
                 if done % 25 == 0:
                     log(f"  enriched {done}/{len(targets)}")

@@ -42,6 +42,7 @@ jobs:
           python leadgen/tests/test_engine.py
           python leadgen/tests/test_heuristics.py
           python leadgen/tests/test_features.py
+          python leadgen/tests/test_hardening.py
 
       - name: Build the EXE
         run: pyinstaller --clean --noconfirm gui/LeadEngine.spec

@@ -221,6 +221,7 @@ COLUMNS = [
     ("# Agents (est.)", "agent_count"), ("TC gap", "tc_gap"),
     ("TC software", "tc_software"), ("Already has TC?", "suppressed_by"),
     ("Why a lead", "why"), ("Suggested opener", "opener"),
+    ("Enrich status", "enrich_note"),
     ("Source", "source"), ("Source URL", "source_url"),
 ]
 

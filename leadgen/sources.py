@@ -22,7 +22,10 @@ from .audit import UA
 FALLBACK_RELEASE = "2026-05-20.0"
 
 
-def _overture_release(con) -> str:
+def _overture_release(con) -> tuple[str, bool]:
+    """Return (release, discovered). discovered=False means we fell back to the
+    hardcoded release because live discovery failed — the caller warns, since that
+    release ages out and you could unknowingly scan stale data."""
     try:
         pat = ("s3://overturemaps-us-west-2/release/202[0-9]-*"
                "/theme=places/type=place/part-00000-*")
@@ -31,10 +34,10 @@ def _overture_release(con) -> str:
             f"FROM glob('{pat}') WHERE rel <> '' ORDER BY rel DESC LIMIT 1"
         ).fetchall()
         if rows and rows[0][0]:
-            return rows[0][0]
+            return rows[0][0], True
     except Exception:
         pass
-    return FALLBACK_RELEASE
+    return FALLBACK_RELEASE, False
 
 
 def overture_collect(bbox, categories: list[str] | None = None,
@@ -48,8 +51,12 @@ def overture_collect(bbox, categories: list[str] | None = None,
     south, west, north, east = bbox
     con = duckdb.connect()
     con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='us-west-2';")
-    release = _overture_release(con)
-    log(f"  Overture release {release}; streaming bbox…")
+    release, discovered = _overture_release(con)
+    if discovered:
+        log(f"  Overture release {release}; streaming bbox…")
+    else:
+        log(f"  WARNING: couldn't discover the latest Overture release; using "
+            f"hardcoded fallback {release} (data may be stale). Streaming bbox…")
     s3 = (f"s3://overturemaps-us-west-2/release/{release}"
           f"/theme=places/type=place/*")
 
@@ -142,9 +149,12 @@ def osm_collect(bbox, osm_tags: list[str], log=print) -> list[dict]:
         if not name:
             continue
         line1 = " ".join(tags.get(k, "") for k in ("addr:housenumber", "addr:street")).strip()
+        # Report the tag this element actually matched, not just the first filter.
+        matched = next((t for t in osm_tags if "=" in t
+                        and tags.get(t.split("=", 1)[0]) == t.split("=", 1)[1]), "")
         out.append({
             "name": name.strip(),
-            "category": next((t for t in osm_tags if "=" in t), ""),
+            "category": matched or next((t for t in osm_tags if "=" in t), ""),
             "website": (tags.get("website") or tags.get("contact:website") or "").strip(),
             "phone": (tags.get("phone") or tags.get("contact:phone") or "").strip(),
             "email": (tags.get("email") or tags.get("contact:email") or "").strip(),
