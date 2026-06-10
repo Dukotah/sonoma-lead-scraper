@@ -62,8 +62,9 @@ def _opener(rec: dict) -> str:
 
 COLUMNS = [
     ("Tier", "tier"), ("Score", "score"), ("Business", "name"),
-    ("Category", "category"), ("City", "city"), ("Phone", "phone"),
-    ("Website", "website"), ("Why a lead", "why"), ("Pitch", "opener"),
+    ("Category", "category"), ("City", "city"), ("Phone", "phone_fmt"),
+    ("Best contact", "best_contact"), ("Website", "website"),
+    ("Why a lead", "why"), ("Pitch", "opener"), ("Completeness", "completeness"),
     ("Address", "address"), ("Source", "source"), ("Source URL", "source_url"),
 ]
 

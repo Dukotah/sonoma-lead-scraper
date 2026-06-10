@@ -86,29 +86,38 @@ def is_weak_url(url: str) -> tuple[bool, str]:
     return False, ""
 
 
-def fetch(url: str, timeout: int = AUDIT_TIMEOUT) -> Optional["requests.Response"]:
+def fetch(url: str, timeout: int = AUDIT_TIMEOUT, retries: int = 1
+          ) -> Optional["requests.Response"]:
     """GET a URL politely; return the Response or None on any failure.
-    Refuses non-public hosts (SSRF guard) and caps the body we read."""
+    Refuses non-public hosts (SSRF guard) and caps the body we read. Retries once
+    on a transient timeout/connection error so a real-but-slow lead site (still a
+    good prospect) isn't silently dropped on a single hiccup."""
     if not url:
         return None
     if not url.startswith("http"):
         url = "http://" + url
     if not is_safe_url(url):
         return None
-    try:
-        r = requests.get(url, headers={"User-Agent": UA}, timeout=timeout,
-                         allow_redirects=True, stream=True)
-        # Redirects can hop to an internal host the initial check never saw.
-        if not is_safe_url(r.url):
+    for attempt in range(retries + 1):
+        try:
+            r = requests.get(url, headers={"User-Agent": UA}, timeout=timeout,
+                             allow_redirects=True, stream=True)
+            # Redirects can hop to an internal host the initial check never saw.
+            if not is_safe_url(r.url):
+                r.close()
+                return None
+            # Read at most MAX_RESPONSE_BYTES, then close the connection.
+            content = r.raw.read(MAX_RESPONSE_BYTES + 1, decode_content=True)
+            r._content = content[:MAX_RESPONSE_BYTES]
             r.close()
+            return r
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if attempt < retries:
+                time.sleep(1.0)
+                continue
             return None
-        # Read at most MAX_RESPONSE_BYTES, then close the connection.
-        content = r.raw.read(MAX_RESPONSE_BYTES + 1, decode_content=True)
-        r._content = content[:MAX_RESPONSE_BYTES]
-        r.close()
-        return r
-    except Exception:
-        return None
+        except Exception:
+            return None
 
 
 def audit_website(url: str) -> dict:

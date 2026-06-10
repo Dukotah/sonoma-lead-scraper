@@ -11,6 +11,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .geo import resolve_market
 from .sources import overture_collect, osm_collect
 from .suppression import norm, build_suppression_set
+from .normalize import normalize_record, finalize_record
+from .audit import hostname, is_weak_url
 from .export import write_outputs
 from .vertical import Vertical
 
@@ -51,17 +53,38 @@ def load_crm_names(path_or_text: str, *, is_text: bool = False) -> set[str]:
     return out
 
 
+def _merge_into(dst: dict, src: dict) -> None:
+    """Back-fill blank contact/geo fields on the surviving record from a duplicate."""
+    for fld in ("website", "phone", "phone_fmt", "area_code", "email",
+                "address", "city", "state", "zip", "lat", "lon"):
+        if not dst.get(fld) and src.get(fld):
+            dst[fld] = src[fld]
+
+
+def _own_host(rec: dict) -> str:
+    """The record's own (non-social) website host, used as a strong dedupe key.
+    Social/listing URLs are skipped so two unrelated shops that both list a
+    facebook page don't get merged. 'www.' is dropped so the bare and www hosts
+    of the same site collapse together."""
+    site = rec.get("website") or ""
+    if not site or is_weak_url(site)[0]:
+        return ""
+    h = hostname(site)
+    return h[4:] if h.startswith("www.") else h
+
+
 def _dedupe(leads: list[dict]) -> list[dict]:
     """Collapse duplicates within one market.
 
-    Two records merge only when their normalized names match AND they're in the
-    same city (or at least one city is blank). This keeps genuinely distinct
-    offices that share a name — common once chains are kept — from collapsing into
-    one, while still merging the same firm seen across sources or with a missing
-    city. The surviving record back-fills any blank contact fields from its dupes.
+    Records merge when they share the same owned website host (a strong identity
+    signal that catches cross-source dupes the name can't), OR when their
+    normalized names match AND they're in the same city (or one city is blank).
+    The same-city guard keeps genuinely distinct offices that share a name — common
+    once chains are kept — from collapsing. The survivor back-fills blank fields.
     """
     groups: list[dict] = []
-    index: dict[str, list[dict]] = {}
+    by_name: dict[str, list[dict]] = {}
+    by_host: dict[str, dict] = {}
 
     def _same_place(a: dict, b: dict) -> bool:
         ca = (a.get("city") or "").strip().lower()
@@ -72,14 +95,19 @@ def _dedupe(leads: list[dict]) -> list[dict]:
         key = norm(r.get("name", ""))
         if not key:
             continue
-        match = next((g for g in index.get(key, []) if _same_place(g, r)), None)
+        host = _own_host(r)
+        match = by_host.get(host) if host else None
+        if match is None:
+            match = next((g for g in by_name.get(key, []) if _same_place(g, r)), None)
         if match is None:
             groups.append(r)
-            index.setdefault(key, []).append(r)
+            by_name.setdefault(key, []).append(r)
+            if host:
+                by_host[host] = r
         else:
-            for fld in ("website", "phone", "email", "address", "city", "lat", "lon"):
-                if not match.get(fld) and r.get(fld):
-                    match[fld] = r[fld]
+            _merge_into(match, r)
+            if host and host not in by_host:
+                by_host[host] = match
     return groups
 
 
@@ -87,7 +115,6 @@ def _enrich_priority(r: dict) -> tuple:
     """Cheap pre-enrichment rank so a capped budget goes to leads we can learn
     from. A real (non-social) website is the big one — without it enrichment is a
     no-op; phone/email are minor tie-breakers."""
-    from .audit import is_weak_url
     site = r.get("website") or ""
     has_site = bool(site) and not is_weak_url(site)[0]
     return (has_site, bool(site), bool(r.get("phone")), bool(r.get("email")))
@@ -139,17 +166,21 @@ def run_pipeline(vertical: Vertical, market: str, *,
                 leads += osm_collect(bbox, vertical.osm_tags, log)
             except Exception as e:
                 log(f"  OSM failed: {e}")
+    # 1a. NORMALIZE values before dedupe so cleaned names + website hosts make
+    # the dedupe keys reliable (and the output is CRM-clean from the start).
+    for r in leads:
+        normalize_record(r)
     log(f"Collected {len(leads)} raw; deduping…")
     leads = _dedupe(leads)
     log(f"  {len(leads)} after dedupe")
 
-    # 1a. drop businesses already in the user's CRM (never hand back a dupe)
+    # 1b. drop businesses already in the user's CRM (never hand back a dupe)
     if exclude_names:
         before = len(leads)
         leads = [r for r in leads if norm(r.get("name", "")) not in exclude_names]
         log(f"  removed {before - len(leads)} already in your CRM ({len(exclude_names)} names)")
 
-    # 1b. chain handling — verticals that don't keep chains drop branded records
+    # 1c. chain handling — verticals that don't keep chains drop branded records
     if not vertical.keep_chains:
         before = len(leads)
         leads = [r for r in leads if not (r.get("brand"))]
@@ -197,8 +228,10 @@ def run_pipeline(vertical: Vertical, market: str, *,
                 if done % 25 == 0:
                     log(f"  enriched {done}/{len(targets)}")
 
-    # 4. SCORE (+ apply suppression flag) + opener
+    # 4. FINALIZE quality fields (after enrichment may have added email/phone),
+    #    then SCORE (+ apply suppression flag) + opener.
     for r in leads:
+        finalize_record(r)
         key = norm(r.get("name", ""))
         if key in suppressed:
             r["suppressed"] = True

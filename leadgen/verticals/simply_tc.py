@@ -16,7 +16,9 @@ COMPETITOR_TC_SEEDS with the real rival TC firms in your mom's markets.
 from __future__ import annotations
 
 from .. import register, Vertical
-from ..enrich import fetch_pages, estimate_roster, find_decision_maker, find_phrases
+from ..enrich import (fetch_pages, estimate_roster, find_decision_maker,
+                      find_phrases, extract_emails, extract_phones)
+from ..audit import hostname
 from ..suppression import build_suppression_set
 
 # ─────────────────────────────── CONFIG ──────────────────────────────────────
@@ -148,6 +150,16 @@ def _enrich(rec: dict, ctx: dict) -> dict:
     name, title = find_decision_maker(pages, config["decision_maker_titles"])
     rec["decision_maker"] = name
     rec["dm_title"] = title
+    # Fill missing contact fields from the site itself — a real email/phone is
+    # what makes a row actually callable in the CRM.
+    if not rec.get("email"):
+        emails = extract_emails(pages, prefer_host=hostname(website))
+        if emails:
+            rec["email"] = emails[0]
+    if not rec.get("phone"):
+        phones = extract_phones(pages)
+        if phones:
+            rec["phone"] = phones[0]
     rec["enrich_note"] = f"read {len(pages)} page(s)"
     return rec
 
@@ -216,8 +228,10 @@ def _opener(rec: dict) -> str:
 COLUMNS = [
     ("Tier", "tier"), ("Score", "score"), ("Brokerage", "name"),
     ("Decision-maker", "decision_maker"), ("Title", "dm_title"),
-    ("Phone", "phone"), ("Email", "email"), ("Website", "website"),
+    ("Phone", "phone_fmt"), ("Email", "email"), ("Owned email?", "email_owned"),
+    ("Best contact", "best_contact"), ("Website", "website"),
     ("City", "city"), ("State", "state"), ("Address", "address"),
+    ("Completeness", "completeness"),
     ("# Agents (est.)", "agent_count"), ("TC gap", "tc_gap"),
     ("TC software", "tc_software"), ("Already has TC?", "suppressed_by"),
     ("Why a lead", "why"), ("Suggested opener", "opener"),

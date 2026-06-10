@@ -14,27 +14,113 @@ twice (image + name) and the same roster echoed in nav/footer across pages.
 from __future__ import annotations
 
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from .audit import fetch, hostname
 
+# Anchor text / hrefs on the homepage that point at the pages worth reading for
+# a brokerage: the roster, the team/about, and the contact page (for email/phone).
+_LINK_KEYWORDS = ("agent", "team", "roster", "associate", "about", "contact",
+                  "staff", "our-people", "meet", "join", "career")
 
-def fetch_pages(base_url: str, paths: list[str], cap: int = 4) -> dict[str, str]:
+
+def _discover_links(home_html: str, base_url: str, cap: int = 8) -> list[str]:
+    """Pull same-site links from the homepage whose href or text suggests a
+    roster/about/contact page. Catches sites whose pages don't match our static
+    path guesses (e.g. /our-realtors, /the-team-2)."""
+    base_host = hostname(base_url)
+    found: list[str] = []
+    seen: set[str] = set()
+    for m in re.finditer(r'<a\b[^>]*href="([^"#]+)"[^>]*>(.*?)</a>',
+                         home_html, re.IGNORECASE | re.DOTALL):
+        href, text = m.group(1), re.sub(r"<[^>]+>", " ", m.group(2)).lower()
+        hay = (href + " " + text).lower()
+        if not any(k in hay for k in _LINK_KEYWORDS):
+            continue
+        url = urljoin(base_url, href)
+        host = hostname(url)
+        if host and host != base_host:   # stay on the business's own site
+            continue
+        key = url.rstrip("/").lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(url)
+        if len(found) >= cap:
+            break
+    return found
+
+
+def fetch_pages(base_url: str, paths: list[str], cap: int = 4,
+                discover: bool = True) -> dict[str, str]:
     """Return {url: html} for the homepage plus up to `cap` candidate sub-pages
-    that actually resolve. Stops early once cap pages succeed."""
+    that actually resolve. Tries links discovered on the homepage first (most
+    likely to be the real team/contact pages), then the static path guesses.
+    Stops early once cap pages succeed."""
     out: dict[str, str] = {}
     if not base_url:
         return out
     home = fetch(base_url)
+    base = base_url if base_url.startswith("http") else "http://" + base_url
+    candidates: list[str] = []
     if home is not None and home.status_code < 400:
         out[base_url] = home.text
-    base = base_url if base_url.startswith("http") else "http://" + base_url
-    for p in paths:
+        if discover:
+            candidates += _discover_links(home.text, base)
+    candidates += [urljoin(base, p) for p in paths]
+
+    seen = {u.rstrip("/").lower() for u in out}
+    for url in candidates:
         if len(out) >= cap + 1:
             break
-        r = fetch(urljoin(base, p))
+        if url.rstrip("/").lower() in seen:
+            continue
+        seen.add(url.rstrip("/").lower())
+        r = fetch(url)
         if r is not None and r.status_code < 400 and len(r.text) > 500:
-            out[urljoin(base, p)] = r.text
+            out[url] = r.text
+    return out
+
+
+# ─────────────────────── contact extraction (fill CRM gaps) ───────────────────
+_EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
+_PHONE_RE = re.compile(r"(?:\+?1[\s.\-]?)?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}")
+_EMAIL_NOISE = ("noreply", "no-reply", "donotreply", "postmaster", "sentry",
+                "wixpress", "example.", "@2x", ".png", ".jpg", ".gif", ".webp")
+
+
+def extract_emails(pages: dict[str, str], prefer_host: str = "") -> list[str]:
+    """Plausible contact emails found across the pages, best-first: an address on
+    the business's own domain ranks above a gmail/yahoo; noise/system mailboxes
+    are dropped. De-duplicated, lowercased."""
+    prefer = (prefer_host or "").lower().lstrip("www.")
+    owned, other = [], []
+    seen: set[str] = set()
+    for html in pages.values():
+        for raw in _EMAIL_RE.findall(html):
+            e = raw.lower()
+            if e in seen or any(bad in e for bad in _EMAIL_NOISE):
+                continue
+            seen.add(e)
+            dom = e.rsplit("@", 1)[1]
+            (owned if prefer and (dom == prefer or dom.endswith("." + prefer)) else other).append(e)
+    return owned + other
+
+
+def extract_phones(pages: dict[str, str]) -> list[str]:
+    """Distinct US-style phone numbers found across the pages (raw text form)."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for html in pages.values():
+        text = re.sub(r"<[^>]+>", " ", html)
+        for m in _PHONE_RE.findall(text):
+            digits = re.sub(r"\D", "", m)
+            if len(digits) == 11 and digits[0] == "1":
+                digits = digits[1:]
+            if len(digits) != 10 or digits in seen:
+                continue
+            seen.add(digits)
+            out.append(m.strip())
     return out
 
 
